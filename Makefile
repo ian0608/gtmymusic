@@ -15,16 +15,13 @@ ifeq ($(OS), SunOS)
 	LDFLAGS=-lsocket -lnsl
     endif
 
-all: client server server2
+all: client server 
 
 client: client.c
 	$(CC) client.c -o nameChanger
 
-server: server.c
-	$(CC) -lcrypto server.c -o changeServer
-
-server2: server_thread.c
-	$(CC) -lcrypto server_thread.c -o threadServer
+server: server_thread.c
+	$(CC) server_thread.c -o threadServer
     
 clean:
 	    rm -f client server *.o

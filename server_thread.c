@@ -1,8 +1,8 @@
 /*///////////////////////////////////////////////////////////
 *
-* FILE:		server.c
-* AUTHOR:	Warren Shenk
-* PROJECT:	CS 3251 Project 1 - Professor Traynor
+* FILE:		thread_server.c
+* AUTHOR:	Warren Shenk, Ian Stainbrook
+* PROJECT:	CS 3251 Project 2 - Professor Traynor
 * DESCRIPTION:	Network Server Code
 *
 *////////////////////////////////////////////////////////////
@@ -22,12 +22,12 @@
 #define RCVBUFSIZE 512		/* The receive buffer size */
 #define SNDBUFSIZE 512		/* The send buffer size */
 #define BUFSIZE 40		/* Your name can be as many as 40 chars*/
-#define MDLEN 32
 #define MAXBUFLEN 10000
+#define MAXPENDING 5
 
 
-int *file1;
-char fileBuffer[MAXBUFLEN + 1];
+FILE *file1;
+char *fileBuffer = NULL;
 
 void DieWithErr(char *errorMessage){
     printf("%s\n", errorMessage);
@@ -52,14 +52,6 @@ int main(int argc, char *argv[])
     unsigned int clntLen;			/* Length of address data struct */
 
     char nameBuf[BUFSIZE];			/* Buff to store name from client */
-    unsigned char md_value[EVP_MAX_MD_SIZE];	/* Buff to store change result */
-    EVP_MD_CTX *mdctx;				/* Digest data structure declaration */
-    const EVP_MD *md;				/* Digest data structure declaration */
-    int md_len;					/* Digest data structure size tracking */
-    
-    
-
-    static const int MAXPENDING = 5;
     
     changeServPort = 6079;
 
@@ -118,24 +110,15 @@ int main(int argc, char *argv[])
 
 void *ThreadMain(void *threadArgs) {
     
-    int serverSock;				/* Server Socket */
     int clientSock;				/* Client Socket */
-    struct sockaddr_in changeServAddr;		/* Local address */
-    struct sockaddr_in changeClntAddr;		/* Client address */
-    unsigned short changeServPort;		/* Server port */
-    unsigned int clntLen;			/* Length of address data struct */
     
     char nameBuf[BUFSIZE];			/* Buff to store name from client */
-    unsigned char md_value[EVP_MAX_MD_SIZE];	/* Buff to store change result */
-    EVP_MD_CTX *mdctx;				/* Digest data structure declaration */
-    const EVP_MD *md;				/* Digest data structure declaration */
-    int md_len;					/* Digest data structure size tracking */
     int i;
+    long bufsize;
   
     
     // Clear the buffers
     memset(nameBuf,0,sizeof(nameBuf));
-    memset(md_value, 0, sizeof(md_value));
     
     // Setup Pthread & get the args
     pthread_detach(pthread_self());
@@ -154,38 +137,54 @@ void *ThreadMain(void *threadArgs) {
     
     /* OPEN FILE */
     if ((file1 = fopen("test.txt", "r")) == -1){
-        fprintf(stderr, "open() failed");
-        exit(EXIT_FAILURE);
+        DieWithErr("File I/O err: fopen() failed");
     }
     
-    /* READ FILE TO BUFFER*/
-    size_t newLen = fread(fileBuffer, sizeof(char), MAXBUFLEN, file1);
-    if (newLen == 0) {
-        fputs("Error reading file", stderr);
-    } else {
-        fileBuffer[++newLen] = '\0'; // Just to be safe.
-
+    /* COMPUTE FILE SIZE */
+    if (fseek(file1, 0, SEEK_END) == 0) {
+        bufsize = ftell(file1);
+        if (bufsize == -1) {
+            DieWithErr("ftell() failed to SEEK_END");
+        }
+        printf("bufsize: %i bytes \n", bufsize);
     }
+    else {
+        DieWithErr("fseek() failed failed to SEEK_END");
+    }
+    
+    fileBuffer = malloc(sizeof(char) * (bufsize + 1));
+    
+    if (fseek(file1, 0, SEEK_SET) != 0) {
+        DieWithErr("fseek() failed to SEEK_SET");
+    }
+        
+    
+    
+    /* READ FILE TO BUFFER*/
+    size_t newLen = fread(fileBuffer, sizeof(char), bufsize, file1);
+    if (newLen == 0) {
+        DieWithErr("File I/O err: fread() failed");
+    } else {
+        fileBuffer[++newLen] = '\0'; // Just to be safe add null terminator
+    }
+    
+    //printf("File Buffer: %s \n", fileBuffer);
     
 
     /* Send file to client */
-	/*	FILL IN	    */
+	/*	FILL IN	  */
+    ssize_t numBytesSent = 0;
     
-    while (numBytesRecvd > 0) {
-        ssize_t numBytesSent = send(clientSock, fileBuffer, sizeof(fileBuffer), 0);
-        if (numBytesSent < 0)
-            DieWithErr("send() failed");
-        else if (numBytesSent != sizeof(fileBuffer))
-            DieWithErr("send() sent unexpected number of bytes");
+    while (numBytesSent < bufsize) {
+        numBytesSent += send(clientSock, fileBuffer + numBytesSent, bufsize, 0);
+        printf("Number of bytes sent %i\n", numBytesSent);
         
         
-        numBytesRecvd = recv(clientSock, nameBuf, MAXBUFLEN, 0);
-        if (numBytesRecvd < 0)
-            DieWithErr("recv() failed");
     }
 
     
     close(clientSock);
+    free(fileBuffer);
     
     return (NULL);
 }

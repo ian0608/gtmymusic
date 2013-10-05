@@ -23,6 +23,8 @@
 #define SNDBUFSIZE 10000		    /* The send buffer size */
 #define MDLEN 32
 
+
+
 int f1;
 
 void DieWithErr(char *errorMessage){
@@ -89,7 +91,7 @@ int main(int argc, char *argv[])
     if (numBytes < 0)
         DieWithErr("send() failed");
     else if (numBytes != nameLen)
-        DieWithErr("send() send unexpected number of bytes");
+        DieWithErr("send() sent unexpected number of bytes");
     
     
     /* Receive and print response from the server */
@@ -111,13 +113,12 @@ int main(int argc, char *argv[])
     
     if ((f1 = creat("recv.txt",
                     S_IRUSR | S_IWUSR)) == -1) {
-        fprintf(stderr, "Can't create file recv.mp2\n");
-        exit(EXIT_FAILURE);
+        DieWithErr("Can't create file");
     }
     if (write(f1, rcvBuf, strlen(rcvBuf)) == -1) {
-		fprintf(stderr, "Can't write file\n");
-		exit(EXIT_FAILURE);
+		DieWithErr("Can't write file");
 	}
+    
     
     
     

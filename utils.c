@@ -10,6 +10,41 @@ Requires linking with -lcrypto
 This function returns a pointer to a list_item_array representing the mp3 files in the current directory. Each individual list_item contains the filename and MD5 hash of the file contents. See main for an example.
 */
 
+int init_list_item_array(list_item_array **toInit)
+{
+	*toInit = malloc(sizeof(list_item_array));
+	if (*toInit == NULL)
+	{
+		return -1;
+	}
+
+	(*toInit)->count = 0;
+
+	(*toInit)->items = malloc(sizeof(list_item *));
+	if((*toInit)->items == NULL)
+	{
+		return -1;
+	}
+	return 0;
+}
+
+int incr_size_list_item_array(list_item_array **toIncr)
+{
+	(*toIncr)->count++;
+	(*toIncr)->items = realloc((*toIncr)->items, (*toIncr)->count*sizeof(list_item *));
+	if((*toIncr)->items == NULL)
+	{
+		return -1;
+	}
+
+	(*toIncr)->items[(*toIncr)->count -1] = malloc(sizeof(list_item));
+	if((*toIncr)->items[(*toIncr)->count -1] == NULL)
+	{
+		return -1;
+	}
+	return 0;
+}
+
 list_item_array *get_list_items_current_dir()
 {
 	DIR *directory;
@@ -22,21 +57,10 @@ list_item_array *get_list_items_current_dir()
 	}
 
 	entry = readdir(directory);
-	//int mp3Count = 0;
 
-	list_item_array *item_array = malloc(sizeof(list_item_array));
-	if (item_array == NULL)
-	{
+	list_item_array *item_array;
+	if(init_list_item_array(&item_array) < 0)
 		return NULL;
-	}
-
-	item_array->count = 0;
-
-	item_array->items = malloc(sizeof(list_item *));
-	if (item_array->items == NULL)
-	{
-		return NULL;
-	}
 
 	while(entry != NULL)
 	{
@@ -44,18 +68,8 @@ list_item_array *get_list_items_current_dir()
 		{
 			//printf("%s\n", entry->d_name);
 			
-			item_array->count++;
-			item_array->items = realloc(item_array->items, item_array->count*sizeof(list_item *));
-			if (item_array->items == NULL)
-			{
+			if(incr_size_list_item_array(&item_array) < 0)
 				return NULL;
-			}
-
-			item_array->items[item_array->count -1] = malloc(sizeof(list_item));
-			if(item_array->items[item_array->count -1] == NULL)
-			{
-				return NULL;
-			}
 			
 			//hash & filename
 			unsigned char hash[MD5_DIGEST_LENGTH];
@@ -109,24 +123,24 @@ void teardown_list_item_array(list_item_array *item_array)
 
 int main(int argc, char *argv[])
 {
-	list_item_array *myListItems = get_list_items_current_dir();
-	if (myListItems == NULL)
+	list_item_array *myList = get_list_items_current_dir();
+	if (myList == NULL)
 	{
 		return -1;
 	}
 
 	int i=0;
-	while (i < myListItems->count)	//for each list_item
+	while (i < myList->count)	//for each list_item
 	{
-		printf("%s\n", myListItems->items[i]->filename);	//print the filename
+		printf("%s\n", myList->items[i]->filename);	//print the filename
 		int j;
 		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
-			printf("%02x", myListItems->items[i]->hash[j]);
+			printf("%02x", myList->items[i]->hash[j]);
 		printf("\n");
 		i++;
 	}
 
-	teardown_list_item_array(myListItems);
+	teardown_list_item_array(myList);
 
 	return 0;
 }

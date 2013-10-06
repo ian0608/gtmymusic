@@ -21,13 +21,14 @@
 
 #define RCVBUFSIZE 512		/* The receive buffer size */
 #define SNDBUFSIZE 512		/* The send buffer size */
-#define BUFSIZE 40		/* Your name can be as many as 40 chars*/
+#define CLNT_REQ_BUFSIZE 38		/* The client request should be 38 bytes long*/
+
+                            //  [4: LIST/PULL] [1: Space] [32: File Hash] [1: \0]
 #define MAXBUFLEN 10000
 #define MAXPENDING 5
+#define DEBUG
+#define DUMP_FBUFF        // Prints out the File Buffer prior to sending to client
 
-
-FILE *file1;
-char *fileBuffer = NULL;
 
 void DieWithErr(char *errorMessage){
     printf("%s\n", errorMessage);
@@ -49,9 +50,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in changeServAddr;		/* Local address */
     struct sockaddr_in changeClntAddr;		/* Client address */
     unsigned short changeServPort;		/* Server port */
-    unsigned int clntLen;			/* Length of address data struct */
-
-    char nameBuf[BUFSIZE];			/* Buff to store name from client */
+    unsigned int clntLen;			/* Length of address data struct */\
     
     changeServPort = 6079;
 
@@ -112,13 +111,20 @@ void *ThreadMain(void *threadArgs) {
     
     int clientSock;				/* Client Socket */
     
-    char nameBuf[BUFSIZE];			/* Buff to store name from client */
+    char clientRequest[CLNT_REQ_BUFSIZE];/* Buff to store name from client */
+    char *clientReqp = clientRequest;
+    char clientArg1[5];
+    char clientArg2[33];
     int i;
     long bufsize;
   
+    FILE *file1;
+    char *fileBuffer = NULL;
     
     // Clear the buffers
-    memset(nameBuf,0,sizeof(nameBuf));
+    memset(clientRequest,0,sizeof(clientRequest));
+    memset(clientArg1, 0, sizeof(clientArg1));
+    memset(clientArg2, 0, sizeof(clientArg2));
     
     // Setup Pthread & get the args
     pthread_detach(pthread_self());
@@ -126,13 +132,52 @@ void *ThreadMain(void *threadArgs) {
     free(threadArgs);
     
     
-    /* Extract Your Name from the packet, store in nameBuf */
+    /* Extract CLIENT REQUEST from the packet, store in clientRequest, arg1 and arg2 */
     /*	FILL IN	    */
-    ssize_t numBytesRecvd = recv(clientSock, nameBuf, BUFSIZE, 0);
+    ssize_t numBytesRecvd = recv(clientSock, clientRequest, CLNT_REQ_BUFSIZE, 0);
     if (numBytesRecvd < 0)
         DieWithErr("recv() failed");
     else
-        printf("Original Name: %s\n", nameBuf);
+        printf("Client Request...\n%s\n", clientRequest);
+    
+    memcpy(clientArg1, clientReqp, (size_t) 4);
+    clientArg1[4] = '\0';
+    
+    #ifdef DEBUG
+    printf("Client Arg 1: ");
+    for (i = 0; i < 4; i++)
+        printf("[%i]:%c ",i,clientArg1[i]);
+    printf("\n");
+    #endif
+    
+    clientReqp = clientRequest;
+    memcpy(clientArg2, clientReqp + 5, (size_t) 32);
+    clientArg2[32] = '\0';
+    
+    #ifdef DEBUG
+    printf("Client Arg 2: ");
+    for (i = 0; i < 32; i ++)
+        printf("[%i]:%c ",i,clientArg2[i]);
+    printf("\n");
+    #endif
+    
+    
+    /* DETERMINE NEXT FUNCTION CALL */
+    if ((strcmp(clientArg1, "PULL")) == 0) {
+        #ifdef DEBUG
+        printf("PULL: TRUE\n");
+        #endif
+    }
+    else if((strcmp(clientArg1, "LIST")) == 0) {
+        #ifdef DEBUG
+        printf("LIST: TRUE\n");
+        #endif
+    }
+    else {
+        #ifdef DEBUG
+        printf("NOT A VALID REQUEST\n");
+        #endif
+    }
     
     
     /* OPEN FILE */
@@ -153,10 +198,16 @@ void *ThreadMain(void *threadArgs) {
     }
     
     fileBuffer = malloc(sizeof(char) * (bufsize + 1));
+    if (fileBuffer == NULL) {
+        DieWithErr("malloc() failed");
+    }
+    
     
     if (fseek(file1, 0, SEEK_SET) != 0) {
         DieWithErr("fseek() failed to SEEK_SET");
     }
+    
+  
         
     
     
@@ -167,8 +218,13 @@ void *ThreadMain(void *threadArgs) {
     } else {
         fileBuffer[++newLen] = '\0'; // Just to be safe add null terminator
     }
-    
-    //printf("File Buffer: %s \n", fileBuffer);
+
+    #ifdef DUMP_FBUFF
+    printf("File Buffer: ");
+    for (i = 0; i < bufsize; i ++)
+        printf("[%i]%c",i, fileBuffer[i]);
+    printf("\n");
+    #endif
     
 
     /* Send file to client */

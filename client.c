@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     /*	    FILL IN	 */
     unsigned int totalBytesRecieved = 0;
     fputs("Recieved:\n", stdout);
-    while (totalBytesRecieved < nameLen) {
+    while (totalBytesRecieved < 25) { // FILE LENGTH SHOULD GO HERE
         
         numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
         if (numBytes < 0)
@@ -107,9 +107,10 @@ int main(int argc, char *argv[])
             DieWithErr("recv() connection closed prematurely");
         
         totalBytesRecieved += numBytes;
-        rcvBuf[numBytes] = '\0';
+        
         
     }
+    rcvBuf[numBytes] = '\0';
     
     if ((f1 = creat("recv.txt",
                     S_IRUSR | S_IWUSR)) == -1) {

@@ -1,8 +1,8 @@
 /*///////////////////////////////////////////////////////////
  *
  * FILE:		client.c
- * AUTHOR:	Warren Shenk
- * PROJECT:	CS 3251 Project 1 - Professor Traynor
+ * AUTHOR:	Warren Shenk and Ian Stainbrook
+ * PROJECT:	CS 3251 Project 2 - Professor Traynor
  * DESCRIPTION:	Network Client Code
  *
  *////////////////////////////////////////////////////////////
@@ -17,6 +17,8 @@
 #include <string.h>
 #include <openssl/evp.h>	    /* for OpenSSL EVP digest libraries/SHA256 */
 #include <fcntl.h>
+#include <stdint.h>
+#include "gtmymusic.h"
 
 /* Constants */
 #define RCVBUFSIZE 10000	    /* The receive buffer size */
@@ -39,30 +41,16 @@ int main(int argc, char *argv[])
     int clientSock;		    /* socket descriptor */
     struct sockaddr_in serv_addr;   /* The server address */
     
-    char *studentName;		    /* Your Name */
-    
     char sndBuf[SNDBUFSIZE];	    /* Send Buffer */
     unsigned char rcvBuf[RCVBUFSIZE];	    /* Receive Buffer */
     unsigned short servPort = 6079;
     
     int i;			    /* Counter Value */
     
-    
     // Clear the buffers
     memset(sndBuf, 0, sizeof(sndBuf));
     memset(rcvBuf, 0, sizeof(rcvBuf));
-    
-    
-    /* Get the Student Name from the command line */
-    if (argc != 2)
-    {
-        printf("Incorrect input format. The correct format is:\n\tnameChanger your_name\n");
-        exit(1);
-    }
-    studentName = argv[1];
-    //servPort = (unsigned short *) atoi(argv[2]);
-    memset(&sndBuf, 0, RCVBUFSIZE);
-    memset(&rcvBuf, 0, RCVBUFSIZE);
+
     
     /* Create a new TCP socket*/
     /*	    FILL IN	*/
@@ -74,7 +62,7 @@ int main(int argc, char *argv[])
     /*	    FILL IN	 */
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serv_addr.sin_addr.s_addr = inet_addr("130.207.114.22");
     serv_addr.sin_port = htons(servPort);
     
     /* Establish connecction to the server */
@@ -85,41 +73,56 @@ int main(int argc, char *argv[])
     
     /* Send the string to the server */
     /*	    FILL IN	 */
-    size_t nameLen = strlen(studentName);
+
+	char* listCmd = "LIST";
+    size_t cmdLen = strlen(listCmd);
     
-    ssize_t numBytes = send(clientSock, studentName, nameLen, 0);
+    ssize_t numBytes = send(clientSock, listCmd, cmdLen + 1, 0);
     if (numBytes < 0)
         DieWithErr("send() failed");
-    else if (numBytes != nameLen)
+    else if (numBytes != cmdLen)
         DieWithErr("send() sent unexpected number of bytes");
     
     
     /* Receive and print response from the server */
     /*	    FILL IN	 */
-    unsigned int totalBytesRecieved = 0;
-    fputs("Recieved:\n", stdout);
-    while (totalBytesRecieved < 25) { // FILE LENGTH SHOULD GO HERE
-        
-        numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
+    unsigned int bytesRec = 0;
+	int32_t *numItems = NULL;
+	
+	numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
+	if (numBytes < 0)
+            DieWithErr("recv() failed");
+        else if (numBytes == 0)
+            DieWithErr("recv() connection closed prematurely");
+	numItems = (int32_t *)rcvBuf;
+	bytesRec += numBytes;
+	
+    while (bytesRec < sizeof(int32_t) + (*numItems)*sizeof(list_item))
+	{
+		numBytes = recv(clientSock, rcvBuf + bytesRec, RCVBUFSIZE - bytesRec, 0);
         if (numBytes < 0)
             DieWithErr("recv() failed");
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
         
-        totalBytesRecieved += numBytes;
-        
+        bytesRec += numBytes;
         
     }
-    rcvBuf[numBytes] = '\0';
-    
-    if ((f1 = creat("recv.txt",
-                    S_IRUSR | S_IWUSR)) == -1) {
-        DieWithErr("Can't create file");
-    }
-    if (write(f1, rcvBuf, strlen(rcvBuf)) == -1) {
-		DieWithErr("Can't write file");
+
+	list_item_array *mostRecentList;
+	if(init_list_item_array(&mostRecentList) < 0)
+		return -1;
+	int k;
+	for(k=0; k<*numItems; k++)
+	{
+		list_item *currentPtr = (list_item *)(rcvBuf+sizeof(int32_t)+(k*sizeof(list_item)));
+		if(incr_size_list_item_array(&mostRecentList) < 0)
+			return -1;
+		memcpy(mostRecentList->items[mostRecentList->count-1]->hash, currentPtr->hash, MD5_DIGEST_LENGTH);
+		memcpy(mostRecentList->items[mostRecentList->count-1]->filename, currentPtr->filename, strlen(currentPtr->filename)+1);
 	}
-    
+
+	    
     
     
     

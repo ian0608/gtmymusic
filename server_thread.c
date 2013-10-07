@@ -1,6 +1,6 @@
 /*///////////////////////////////////////////////////////////
 *
-* FILE:		thread_server.c
+* FILE:		server.c
 * AUTHOR:	Warren Shenk, Ian Stainbrook
 * PROJECT:	CS 3251 Project 2 - Professor Traynor
 * DESCRIPTION:	Network Server Code
@@ -8,7 +8,6 @@
 *////////////////////////////////////////////////////////////
 
 /*Included libraries*/
-//
 
 #include <stdio.h>	  /* for printf() and fprintf() */
 #include <sys/socket.h>	  /* for socket(), connect(), send(), and recv() */
@@ -24,15 +23,11 @@
 #include <inttypes.h>
 #include "gtmymusic.h"
 
-#define RCVBUFSIZE 512		/* The receive buffer size */
-#define SNDBUFSIZE 512		/* The send buffer size */
-#define CLNT_REQ_BUFSIZE 38		/* The client request should be 38 bytes long*/
-
-                            //  [4: LIST/PULL] [1: Space] [32: File Hash] [1: \0]
-#define MAXBUFLEN 10000
+		
+#define ARG1_SIZE 4
+#define ARG2_SIZE MD5_DIGEST_LENGTH
+#define CLNT_REQ_BUFSIZE ARG1_SIZE + 1 + ARG2_SIZE +1 /* The client request should be 22 bytes long*/
 #define MAXPENDING 5
-#define DEBUG             // Debug flag
-//#define DUMP_FBUFF        // Flag: prints out the File Buffer prior to sending to client
 
 
 void DieWithErr(char *errorMessage){
@@ -45,8 +40,8 @@ struct ThreadArgs {
 };
 
 void *ThreadMain(void *args);
-void pull_resp(int clientSock);
 void send_list(int clientSock);
+void pull_resp(int clinetSock, unsigned char hash[ARG2_SIZE]);
 
 /* The main function */
 int main(int argc, char *argv[])
@@ -57,7 +52,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in changeServAddr;		/* Local address */
     struct sockaddr_in changeClntAddr;		/* Client address */
     unsigned short changeServPort;		/* Server port */
-    unsigned int clntLen;			/* Length of address data struct */\
+    unsigned int clntLen;			/* Length of address data struct */
     
     changeServPort = 6079;
 
@@ -117,50 +112,61 @@ int main(int argc, char *argv[])
 void *ThreadMain(void *threadArgs) {
     
     int clientSock;				/* Client Socket */
-    
+    int i;
     char clientRequest[CLNT_REQ_BUFSIZE];/* Buff to store name from client */
     char *clientReqp = clientRequest;
-    char clientArg1[5];
-    char clientArg2[33];
+    char clientArg1[ARG1_SIZE];
+    unsigned char clientArg2[ARG2_SIZE];
     
     // Clear the buffers
-    memset(clientRequest,0,sizeof(clientRequest));
-    memset(clientArg1, 0, sizeof(clientArg1));
-    memset(clientArg2, 0, sizeof(clientArg2));
+    memset(clientRequest, 0, CLNT_REQ_BUFSIZE);
+    memset(clientArg1, 0, ARG1_SIZE);
+    memset(clientArg2, 0, ARG2_SIZE);
     
     // Setup Pthread & get the args
     pthread_detach(pthread_self());
     clientSock = ((struct ThreadArgs *) threadArgs)->clntSock;
     free(threadArgs);
     
+    unsigned int numBytesRecvd = 0;
+    /* Extract CLIENT REQUEST ARG 1 from the packet, store in clientRequest, arg1*/ 
+    while (numBytesRecvd < ARG1_SIZE) {
+    	numBytesRecvd += recv(clientSock, clientRequest + numBytesRecvd, CLNT_REQ_BUFSIZE, 0);
+   	if (numBytesRecvd < 0)
+        	DieWithErr("recv() failed");
+    	else if (numBytesRecvd == 0)
+		DieWithErr("recv() closed prematurely");
+    }
+//
+    printf("Client Request: %s\n", clientRequest);
     
-    /* Extract CLIENT REQUEST from the packet, store in clientRequest, arg1 and arg2 */
-    /*	FILL IN	    */
-    ssize_t numBytesRecvd = recv(clientSock, clientRequest, CLNT_REQ_BUFSIZE, 0);
-    if (numBytesRecvd < 0)
-        DieWithErr("recv() failed");
-    else
-        printf("Client Request...\n%s\n", clientRequest);
-    
-    memcpy(clientArg1, clientReqp, (size_t) 4);
-    clientArg1[4] = '\0';
-    
-    
-    clientReqp = clientRequest;
-    memcpy(clientArg2, clientReqp + 5, (size_t) 32);
-    clientArg2[32] = '\0';
-    
-    
+    memcpy(clientArg1, clientReqp, (size_t) ARG1_SIZE);
     
     /* DETERMINE NEXT FUNCTION CALL */
-    if ((strcmp(clientArg1, "PULL")) == 0) {
-	pull_resp(clientSock);
-	exit(EXIT_SUCCESS);
+    if ((memcmp(clientArg1, "PULL", ARG1_SIZE)) == 0) {
+	    	printf("PULL\n");
+	    	/* Extract CLIENT REQUEST from the packet, store in clientRequest, arg1 and arg2 */ 
+	    	while (numBytesRecvd < CLNT_REQ_BUFSIZE) {
+	    		numBytesRecvd += recv(clientSock, clientRequest + numBytesRecvd, CLNT_REQ_BUFSIZE, 0);
+   			if (numBytesRecvd < 0)
+				DieWithErr("recv() failed");
+	    		else if (numBytesRecvd == 0)
+				DieWithErr("recv() closed prematurely");
+	    	}
+	    	clientReqp = clientRequest;
+    		memcpy(clientArg2, clientReqp + ARG1_SIZE + 1, (size_t) ARG2_SIZE);
+
+    		printf("Client Arg 2: ");
+    
+    		for (i = 0; i < ARG2_SIZE; i++) { 
+    			printf("%02x", clientArg2[i]);
+   		}
+    		printf("\n");
+	    	pull_resp(clientSock, clientArg2);
     }
-    else if((strcmp(clientArg1, "LIST")) == 0) {
+    else if((memcmp(clientArg1, "LIST", ARG1_SIZE)) == 0) {
+	printf("LIST\n");
         send_list(clientSock);
-        exit(EXIT_SUCCESS);
-        
     }
     else {
         printf("NOT A VALID REQUEST\n");
@@ -169,7 +175,7 @@ void *ThreadMain(void *threadArgs) {
     return (NULL);
 }
 
-void pull_resp(int clientSock) {
+void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 	char *sendBuff;
     	FILE *file1;
 	
@@ -178,7 +184,18 @@ void pull_resp(int clientSock) {
 		DieWithErr("get_list_items_current_dir() failed");
 	}
     
-	//int32_t listCount = myList->count;
+	int listCount = myList->count;
+	int i;
+	for (i = 0; i < listCount; i ++)		{
+		int j;
+		for (j=0; j < MD5_DIGEST_LENGTH; j++) {		
+		        if (memcmp(myList->items[i]->hash, hash, ARG2_SIZE) == 0) {
+			      printf("%s\n", myList->items[i]->filename);
+			}
+			printf("%02x", myList->items[i]->hash[j]);
+		}
+		printf("\n");
+	}
 
 	int64_t sendBuffSize;
 	int64_t fileSize;
@@ -245,25 +262,20 @@ void send_list(int clientSock) {
 	if (myList == NULL) {
 		DieWithErr("get_list_items_current_dir() failed");
 	}
-    
-    	printf("list creation test\n");
 	
-	
-	int32_t listCount = myList->count;
+		
 
+	int32_t listCount = myList->count;
 	size_t sendBuffSize = sizeof(int32_t) + sizeof(list_item)*listCount;
-	printf("Size of int32_t: %zu\n", sizeof(int32_t));
-	printf("Size of list_item: %zu\n", sizeof(list_item));
 	printf("Send Buffer Size: %zu\n", sendBuffSize);
-	printf("My list size: %i\n", myList->count);
 	sendBuff = malloc(sendBuffSize);
 	
 	memcpy(sendBuff, &listCount, sizeof(int32_t));
 	int i=0;
 
-	while (i < myList->count)	//for each list_item
+	while (i < listCount)	//for each list_item
 	{	
-		printf("I: %i\n",i);
+		printf("i: %i\n",i);
 		printf("List Item Name: %s\n", myList->items[i]->filename);
 		int j = 0;
 		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash

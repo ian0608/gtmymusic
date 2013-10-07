@@ -21,7 +21,7 @@ client: client.c utils.c
 	$(CC) -Wall utils.c client.c -o musicClient -lcrypto
 
 server: server_thread.c
-	$(CC) server_thread.c -o threadServer
+	$(CC) -Wall utils.c server_thread.c -o server -lpthread -lcrypto -lssl
     
 clean:
 	    rm -f musicClient *.o

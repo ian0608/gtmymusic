@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <openssl/md5.h>
+#include <inttypes.h>
 #include "gtmymusic.h"
 
 #define RCVBUFSIZE 512		/* The receive buffer size */
@@ -118,12 +119,6 @@ void *ThreadMain(void *threadArgs) {
     char *clientReqp = clientRequest;
     char clientArg1[5];
     char clientArg2[33];
-    int i;
-    size_t bufsize;
-  
-    FILE *file1;
-    FILE *file2;
-    char *fileBuffer = NULL;
     
     // Clear the buffers
     memset(clientRequest,0,sizeof(clientRequest));
@@ -147,118 +142,96 @@ void *ThreadMain(void *threadArgs) {
     memcpy(clientArg1, clientReqp, (size_t) 4);
     clientArg1[4] = '\0';
     
-    #ifdef DEBUG
-    printf("Client Arg 1: ");
-    for (i = 0; i < 4; i++)
-        printf("[%i]:%c ",i,clientArg1[i]);
-    printf("\n");
-    #endif
     
     clientReqp = clientRequest;
     memcpy(clientArg2, clientReqp + 5, (size_t) 32);
     clientArg2[32] = '\0';
     
-    #ifdef DEBUG
-    printf("Client Arg 2: ");
-    for (i = 0; i < 32; i ++)
-        printf("[%i]:%c ",i,clientArg2[i]);
-    printf("\n");
-    #endif
     
     
     /* DETERMINE NEXT FUNCTION CALL */
     if ((strcmp(clientArg1, "PULL")) == 0) {
-        #ifdef DEBUG
-        printf("PULL: TRUE\n");
-        #endif
+	pull_resp(clientSock);
+	return 1;
     }
     else if((strcmp(clientArg1, "LIST")) == 0) {
-        #ifdef DEBUG
-        printf("LIST: TRUE\n");
-        #endif
         send_list(clientSock);
         return 1;
         
     }
     else {
-        #ifdef DEBUG
         printf("NOT A VALID REQUEST\n");
-        #endif
     }
-    
-    
-    /* OPEN FILE */
-    if ((file1 = fopen("04 Son's Gonna Rise.mp3", "r")) == NULL){
-        DieWithErr("File I/O err: fopen() failed");
-    }
-    
-    /* COMPUTE FILE SIZE */
-    if (fseek(file1, 0, SEEK_END) == 0) {
-        bufsize = ftell(file1);
-        if (bufsize == -1) {
-            DieWithErr("ftell() failed to SEEK_END");
-        }
-        printf("bufsize: %zu bytes \n", bufsize);
-    }
-    else {
-        DieWithErr("fseek() failed failed to SEEK_END");
-    }
-    
-    fileBuffer = malloc(sizeof(char) * bufsize);
-    if (fileBuffer == NULL) {
-        DieWithErr("malloc() failed");
-    }
-    
-    
-    if (fseek(file1, 0, SEEK_SET) != 0) {
-        DieWithErr("fseek() failed to SEEK_SET");
-    }
-    
-  
-        
-    
-    
-    /* READ FILE TO BUFFER*/
-    size_t newLen = fread(fileBuffer, sizeof(char), bufsize, file1);
-    if (newLen == 0) {
-        DieWithErr("File I/O err: fread() failed");
-    } else {
-        fileBuffer[++newLen] = '\0'; // Just to be safe add null terminator
-    }
-
-    #ifdef DUMP_FBUFF
-    printf("File Buffer: ");
-    for (i = 0; i < bufsize; i ++)
-        printf("%c",i, fileBuffer[i]);
-    printf("\n");
-    #endif
-    
-
-    /* Send file to client */
-	/*	FILL IN	  */
-    ssize_t numBytesSent = 0;
-    
-    while (numBytesSent < bufsize) {
-        numBytesSent += send(clientSock, fileBuffer + numBytesSent, bufsize, 0);
-        printf("Number of bytes sent %zu\n", numBytesSent);
-    }
-    
-    #ifdef DEBUG
-    if ((file2 = creat("send.mp3", S_IRUSR | S_IWUSR)) == NULL) {
-        DieWithErr("Can't create file");
-    }
-    if (write(file2, fileBuffer, bufsize) == -1) {
-		DieWithErr("Can't write file");
-	}
-    #endif
-
-    
-    close(clientSock);
-    free(fileBuffer);
     
     return (NULL);
 }
 
+void pull_resp(int clientSock) {
+	char *sendBuff;
+    	FILE *file1;
+	
+	list_item_array *myList = get_list_items_current_dir();
+	if (myList == NULL) {
+		DieWithErr("get_list_items_current_dir() failed");
+	}
+    
+	//int32_t listCount = myList->count;
+
+	int64_t sendBuffSize;
+	int64_t fileSize;
+	    /* OPEN FILE */
+   	if ((file1 = fopen("04 Son's Gonna Rise.mp3", "r")) == NULL){
+      		DieWithErr("File I/O err: fopen() failed");
+    	}
+    
+    	/* COMPUTE FILE SIZE */
+    	if (fseek(file1, 0, SEEK_END) == 0) {
+		fileSize = ftell(file1);
+        	sendBuffSize = fileSize + sizeof(int64_t);
+       		if (sendBuffSize == -1) {
+            		DieWithErr("ftell() failed to SEEK_END");
+        	}
+        	printf("sendBuffSize: %" PRId64 " bytes \n", sendBuffSize);
+    	}
+	else {
+        	DieWithErr("fseek() failed failed to SEEK_END");
+    	}
+    
+    	sendBuff = malloc(sendBuffSize);
+    	if (sendBuff == NULL) {
+        	DieWithErr("malloc() failed");
+    	}
+    	if (fseek(file1, 0, SEEK_SET) != 0) {
+        	DieWithErr("fseek() failed to SEEK_SET");
+    	}
+    
+  
+        memcpy(sendBuff, &fileSize, sizeof(int64_t));
+    
+    
+    	/* READ FILE TO BUFFER*/
+    	size_t newLen = fread(sendBuff + sizeof(int64_t), sizeof(char), fileSize, file1);
+    	if (newLen == 0) {
+        	DieWithErr("File I/O err: fread() failed");
+    	} else {
+    	    	sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
+    	}
+   	 
+  	/* Send file to client */
+	/*	FILL IN	  */
+ 	ssize_t numBytesSent = 0;
+ 	   
+ 	while (numBytesSent < sendBuffSize) {
+     		numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
+    	    	printf("Number of bytes sent %zu\n", numBytesSent);
+    	}
+    
+
+    
+    	close(clientSock);
+    	free(sendBuff);
+	
+}
 
 void send_list(int clientSock) {
 	char *sendBuff;
@@ -287,8 +260,13 @@ void send_list(int clientSock) {
 	while (i < myList->count)	//for each list_item
 	{	
 		printf("I: %i\n",i);
+		printf("List Item Name: %s\n", myList->items[i]->filename);
+		int j = 0;
+		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
+			printf("%02x", myList->items[i]->hash[j]);
+		printf("\n");
 		memcpy(sendBuff + sizeof(int32_t) + i*sizeof(list_item), myList->items[i], sizeof(list_item));
-        	i++;
+    		i++;
 	}
 	printf("SENDING FILE\n");
 	/* Send file to client */

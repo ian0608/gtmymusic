@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     ssize_t numBytes = send(clientSock, listCmd, cmdLen + 1, 0);
     if (numBytes < 0)
         DieWithErr("send() failed");
-    else if (numBytes != cmdLen)
+    else if (numBytes != cmdLen + 1)
         DieWithErr("send() sent unexpected number of bytes");
     
     
@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
 	numItems = (int32_t *)rcvBuf;
+	printf("Received %u items\n", *numItems);
 	bytesRec += numBytes;
 	
     while (bytesRec < sizeof(int32_t) + (*numItems)*sizeof(list_item))

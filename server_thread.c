@@ -44,6 +44,8 @@ struct ThreadArgs {
 };
 
 void *ThreadMain(void *args);
+void pull_resp(int clientSock);
+void send_list(int clientSock);
 
 /* The main function */
 int main(int argc, char *argv[])
@@ -62,6 +64,9 @@ int main(int argc, char *argv[])
     /*	    FILL IN	*/
     if ((serverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         DieWithErr("socket() failed");
+
+	int on = 1;
+	setsockopt(serverSock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     
     /* Construct local address structure*/
     /*	    FILL IN	*/

@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     unsigned char rcvBuf[RCVBUFSIZE];	    /* Receive Buffer */
     unsigned short servPort = 6079;
     
-    int i;			    /* Counter Value */
+    //int i;			    /* Counter Value */
     
     // Clear the buffers
     memset(sndBuf, 0, sizeof(sndBuf));
@@ -122,17 +122,23 @@ int main(int argc, char *argv[])
 		memcpy(mostRecentList->items[mostRecentList->count-1]->filename, currentPtr->filename, strlen(currentPtr->filename)+1);
 	}
 
-	    
+	k=0;
+	while (k < mostRecentList->count)	//for each list_item
+	{
+		printf("%s\n", mostRecentList->items[k]->filename);	//print the filename
+		int j;
+		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
+			printf("%02x", mostRecentList->items[k]->hash[j]);
+		printf("\n");
+		k++;
+	}    
     
     
-    
+    /*
     for(i = 0; i < RCVBUFSIZE; i++)
         printf("%c", rcvBuf[i]);
     printf("\n");
-    
-    
-    
-    
+    */
     
     return 0; 
 }

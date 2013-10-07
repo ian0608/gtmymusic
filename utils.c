@@ -157,6 +157,7 @@ list_item_array *diff_lists(list_item_array *authoritative, list_item_array *oth
 	return diff_list;
 }
 
+/*
 int main(int argc, char *argv[])
 {
 	list_item_array *myList = get_list_items_current_dir();
@@ -212,3 +213,4 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+*/

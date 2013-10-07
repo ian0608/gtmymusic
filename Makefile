@@ -1,8 +1,8 @@
 #################################################################
 ##
 ## FILE:	Makefile
-## PROJECT:	CS 3251 Project 1 - Professor Traynor
-## DESCRIPTION: Compile Project 1
+## PROJECT:	CS 3251 Project 2 - Professor Traynor
+## DESCRIPTION: Compile Project 2
 ##
 #################################################################
 
@@ -17,12 +17,12 @@ ifeq ($(OS), SunOS)
 
 all: client server 
 
-client: client.c
-	$(CC) client.c -o nameChanger
+client: client.c utils.c
+	$(CC) -Wall utils.c client.c -o musicClient -lcrypto
 
 server: server_thread.c
 	$(CC) server_thread.c -o threadServer
     
 clean:
-	    rm -f client server *.o
+	    rm -f musicClient *.o
 

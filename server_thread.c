@@ -64,9 +64,6 @@ int main(int argc, char *argv[])
     /*	    FILL IN	*/
     if ((serverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         DieWithErr("socket() failed");
-
-	int on = 1;
-	setsockopt(serverSock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     
     /* Construct local address structure*/
     /*	    FILL IN	*/
@@ -157,11 +154,11 @@ void *ThreadMain(void *threadArgs) {
     /* DETERMINE NEXT FUNCTION CALL */
     if ((strcmp(clientArg1, "PULL")) == 0) {
 	pull_resp(clientSock);
-	return 1;
+	exit(EXIT_SUCCESS);
     }
     else if((strcmp(clientArg1, "LIST")) == 0) {
         send_list(clientSock);
-        return 1;
+        exit(EXIT_SUCCESS);
         
     }
     else {
@@ -235,6 +232,7 @@ void pull_resp(int clientSock) {
     
     	close(clientSock);
     	free(sendBuff);
+
 	
 }
 

@@ -44,6 +44,8 @@ struct ThreadArgs {
 };
 
 void *ThreadMain(void *args);
+void pull_resp(int clientSock);
+void send_list(int clientSock);
 
 /* The main function */
 int main(int argc, char *argv[])
@@ -152,11 +154,11 @@ void *ThreadMain(void *threadArgs) {
     /* DETERMINE NEXT FUNCTION CALL */
     if ((strcmp(clientArg1, "PULL")) == 0) {
 	pull_resp(clientSock);
-	return 1;
+	exit(EXIT_SUCCESS);
     }
     else if((strcmp(clientArg1, "LIST")) == 0) {
         send_list(clientSock);
-        return 1;
+        exit(EXIT_SUCCESS);
         
     }
     else {
@@ -230,6 +232,7 @@ void pull_resp(int clientSock) {
     
     	close(clientSock);
     	free(sendBuff);
+
 	
 }
 

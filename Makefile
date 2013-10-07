@@ -20,9 +20,9 @@ all: client server
 client: client.c utils.c
 	$(CC) -Wall utils.c client.c -o musicClient -lcrypto
 
-server: server_thread.c
+server: server_thread.c utils.c
 	$(CC) -Wall utils.c server_thread.c -o server -lpthread -lcrypto -lssl
     
 clean:
-	    rm -f musicClient *.o
+	    rm -f musicClient server *.o
 

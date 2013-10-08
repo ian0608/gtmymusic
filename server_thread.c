@@ -201,6 +201,8 @@ while(1) {
 void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 	char *sendBuff;
     	FILE *file1;
+	char *filename;
+	//char *test = "04 Son's Gonna Rise.mp3";
 	
 	list_item_array *myList = get_list_items_current_dir();
 	if (myList == NULL) {
@@ -214,16 +216,17 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 		for (j=0; j < MD5_DIGEST_LENGTH; j++) {		
 		        if (memcmp(myList->items[i]->hash, hash, ARG2_SIZE) == 0) {
 			      printf("%s\n", myList->items[i]->filename);
+			      filename = myList->items[i]->filename;
 			}
 			printf("%02x", myList->items[i]->hash[j]);
 		}
 		printf("\n");
 	}
-
+	printf("File: %s\n", filename);
 	int64_t sendBuffSize;
 	int64_t fileSize;
 	    /* OPEN FILE */
-   	if ((file1 = fopen("04 Son's Gonna Rise.mp3", "r")) == NULL){
+   	if ((file1 = fopen(filename, "r")) == NULL){
       		Err("File I/O err: fopen() failed");
     	}
     

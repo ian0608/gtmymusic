@@ -320,7 +320,7 @@ void send_list(int clientSock) {
 		memcpy(sendBuff + sizeof(int32_t) + i*sizeof(list_item), myList->items[i], sizeof(list_item));
     		i++;
 	}
-	printf("SENDING FILE\n");
+	printf("SENDING LIST ITEMS\n");
 	/* Send file to client */
 	/*	FILL IN	  */
    	ssize_t numBytesSent = 0;

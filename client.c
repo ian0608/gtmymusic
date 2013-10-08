@@ -48,7 +48,8 @@ int diff()
 	list_item_array *currentDirItems = get_list_items_current_dir();
 	if (currentDirItems == NULL)
 	{
-		return -1;
+		if(init_list_item_array(&currentDirItems) < 0)
+			return -1;
 	}
 	mostRecentDiff = diff_lists(mostRecentList, currentDirItems);
 	if (mostRecentDiff == NULL)
@@ -56,20 +57,26 @@ int diff()
 		return -1;
 	}
 	
-
-	printf("current directory contents:\n");
 	int i=0;
+	printf("Current directory contents:\n");
+	if (currentDirItems->count > 0)
+	{
 	while (i < currentDirItems->count)	//for each list_item
 	{
 		printf("%s\n", currentDirItems->items[i]->filename);	//print the filename
 		int j;
 		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
 			printf("%02x", currentDirItems->items[i]->hash[j]);
-		printf("\n");
+		printf("\n\n");
 		i++;
 	}
+	}
+	else
+		printf("No music in current directory\n\n");
 
-	printf("diff result:\n");
+	if (mostRecentDiff -> count > 0)
+	{
+	printf("Missing the following files from server:\n");
 	i=0;
 	while (i < mostRecentDiff->count)	//for each list_item
 	{
@@ -77,9 +84,12 @@ int diff()
 		int j;
 		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
 			printf("%02x", mostRecentDiff->items[i]->hash[j]);
-		printf("\n");
+		printf("\n\n");
 		i++;
 	}
+	}
+	else
+		printf("Client is up-to-date with server\n");		
 
 	teardown_list_item_array(currentDirItems);
 	return 0;
@@ -87,6 +97,12 @@ int diff()
 
 int pull()
 {
+	if (mostRecentDiff->count == 0)
+	{
+		printf("Nothing to pull\n\n");
+		return 0;
+	}
+
 	//iterate through most recent diff
 	int i=0;
 	while (i < mostRecentDiff->count)	//for each list_item in most recent diff (what client doesn't have)
@@ -175,7 +191,7 @@ int list()
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
 	numItems = *((int32_t *)rcvBuf);
-	printf("Received %u items\n", numItems);
+	printf("%u files on server:\n\n", numItems);
 	bytesRec += numBytes;
 
 	unsigned char *listBuf = (unsigned char *)malloc(sizeof(int32_t) + (numItems)*sizeof(list_item));
@@ -215,7 +231,7 @@ int list()
 		int j;
 		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
 			printf("%02x", mostRecentList->items[k]->hash[j]);
-		printf("\n");
+		printf("\n\n");
 		k++;
 	}
 	return 0; 
@@ -240,7 +256,7 @@ int main(int argc, char *argv[])
     /*	    FILL IN	 */
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("130.207.114.22");
+    serv_addr.sin_addr.s_addr = inet_addr("130.207.114.22");	//shuttle2
     serv_addr.sin_port = htons(servPort);
     
     /* Establish connecction to the server */
@@ -261,7 +277,11 @@ int main(int argc, char *argv[])
 		{
 			if (inputCtr >= 6) break;
 			char current = getchar();
-			if (current == EOF || current == '\n') break;
+			if (current == EOF || current == '\n')
+			{	
+				ungetc(current, stdin);		
+				break;
+			}
 			userCmd[inputCtr] = current;
 			inputCtr++;
 		}
@@ -269,15 +289,19 @@ int main(int argc, char *argv[])
 		//allow for six characters plus null terminator so that extra characters after the longest command
 		//will invalidate that input
 
+		char flush = getchar();
+		while (flush != '\n' && flush != EOF)
+			flush = getchar();
+
 		if (strcmp(userCmd, "LIST") == 0)
 		{
-			printf("User entered LIST\n");
+			printf("User entered LIST\n\n");
 			if (list() < 0)
 				printf("LIST failed\n");
 		}
 		else if (strcmp(userCmd, "DIFF") == 0)
 		{
-			printf("User entered DIFF\n");
+			printf("User entered DIFF\n\n");
 			if (mostRecentList == NULL)
 			{
 				printf("Must run LIST first\n");
@@ -287,7 +311,7 @@ int main(int argc, char *argv[])
 		}
 		else if (strcmp(userCmd, "PULL") == 0)
 		{
-			printf("User entered PULL\n");
+			printf("User entered PULL\n\n");
 			if (mostRecentDiff == NULL)
 			{
 				printf("Must run DIFF first\n");
@@ -295,6 +319,19 @@ int main(int argc, char *argv[])
 			else if (pull() < 0)
 				printf("PULL failed\n");
 		}
+		else if (strcmp(userCmd, "LEAVE") == 0)
+		{
+			printf("User entered LEAVE\n\n");
+
+			if (mostRecentList != NULL)
+				teardown_list_item_array(mostRecentList);
+			if (mostRecentDiff != NULL)
+				teardown_list_item_array(mostRecentDiff);
+
+			close(clientSock);
+			exit(EXIT_SUCCESS);
+		}
+		printf("\n");
 	}   
     
     return 0; 

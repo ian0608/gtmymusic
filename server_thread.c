@@ -201,7 +201,7 @@ while(1) {
 void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 	char *sendBuff;
     	FILE *file1;
-	char *filename;
+	char *filename = NULL;
 	//char *test = "04 Son's Gonna Rise.mp3";
 	
 	list_item_array *myList = get_list_items_current_dir();
@@ -223,46 +223,60 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 		printf("\n");
 	}
 	printf("File: %s\n", filename);
+
+
 	int64_t sendBuffSize;
 	int64_t fileSize;
-	    /* OPEN FILE */
-   	if ((file1 = fopen(filename, "r")) == NULL){
-      		Err("File I/O err: fopen() failed");
-    	}
-    
-    	/* COMPUTE FILE SIZE */
-    	if (fseek(file1, 0, SEEK_END) == 0) {
-		fileSize = ftell(file1);
-        	sendBuffSize = fileSize + sizeof(int64_t);
-       		if (sendBuffSize == -1) {
-            		Err("ftell() failed to SEEK_END");
+
+	if (filename != NULL) {
+		    /* OPEN FILE */
+	   	if ((file1 = fopen(filename, "r")) == NULL){
+	      		Err("File I/O err: fopen() failed");
+	    	}
+	    
+	    	/* COMPUTE FILE SIZE */
+	    	if (fseek(file1, 0, SEEK_END) == 0) {
+			fileSize = ftell(file1);
+			sendBuffSize = fileSize + sizeof(int64_t);
+	       		if (sendBuffSize == -1) {
+		    		Err("ftell() failed to SEEK_END");
+			}
+			printf("sendBuffSize: %" PRId64 " bytes \n", sendBuffSize);
+	    	}
+		else {
+			Err("fseek() failed failed to SEEK_END");
 		}
-        	printf("sendBuffSize: %" PRId64 " bytes \n", sendBuffSize);
-    	}
-	else {
-        	Err("fseek() failed failed to SEEK_END");
+	    
+	    	sendBuff = malloc(sendBuffSize);
+	    	if (sendBuff == NULL) {
+			Err("malloc() failed");
+	    	}
+	    	if (fseek(file1, 0, SEEK_SET) != 0) {
+			Err("fseek() failed to SEEK_SET");
+	    	}
+	    
+	  
+		memcpy(sendBuff, &fileSize, sizeof(int64_t));
+	    
+	    
+	    	/* READ FILE TO BUFFER*/
+	    	size_t newLen = fread(sendBuff + sizeof(int64_t), sizeof(char), fileSize, file1);
+	    	if (newLen == 0) {
+			Err("File I/O err: fread() failed");
+	    	} else {
+	    	    	sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
+	    	}
 	}
-    
-    	sendBuff = malloc(sendBuffSize);
-    	if (sendBuff == NULL) {
-        	Err("malloc() failed");
-    	}
-    	if (fseek(file1, 0, SEEK_SET) != 0) {
-        	Err("fseek() failed to SEEK_SET");
-    	}
-    
-  
-        memcpy(sendBuff, &fileSize, sizeof(int64_t));
-    
-    
-    	/* READ FILE TO BUFFER*/
-    	size_t newLen = fread(sendBuff + sizeof(int64_t), sizeof(char), fileSize, file1);
-    	if (newLen == 0) {
-        	Err("File I/O err: fread() failed");
-    	} else {
-    	    	sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
-    	}
-   	 
+	else{
+		fileSize = -1;
+		sendBuffSize = sizeof(int64_t);
+		sendBuff = malloc(sendBuffSize);
+		if (sendBuff == NULL) {
+			Err("malloc() failed");		
+		}
+		memcpy(sendBuff, &fileSize, sizeof(int64_t));
+	}
+
   	/* Send file to client */
 	/*	FILL IN	  */
  	ssize_t numBytesSent = 0;
@@ -274,7 +288,6 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
     
     	free(sendBuff);
 
-	
 }
 
 void send_list(int clientSock) {

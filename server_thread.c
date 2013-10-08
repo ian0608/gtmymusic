@@ -199,7 +199,7 @@ while(1) {
 }
 
 void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
-	char *sendBuff;
+	unsigned char *sendBuff;
     	FILE *file1;
 	char *filename = NULL;
 	//char *test = "04 Son's Gonna Rise.mp3";

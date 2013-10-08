@@ -99,10 +99,6 @@ int pull()
 		char pullCmd[strlen(pullStr) + MD5_DIGEST_LENGTH];
 		memcpy(pullCmd, pullStr, strlen(pullStr));	//no null-terminator
 		memcpy(pullCmd+strlen(pullStr), mostRecentDiff->items[i]->hash, MD5_DIGEST_LENGTH);
-    	
-		int p;
-		for (p = 0; p < MD5_DIGEST_LENGTH; p++)
-    			printf("%02x", pullCmd[strlen(pullStr)+p] );
 
 		size_t cmdLen = strlen(pullStr) + MD5_DIGEST_LENGTH;
 		ssize_t numBytes = send(clientSock, pullCmd, cmdLen, 0);
@@ -125,16 +121,15 @@ int pull()
 		else if (numBytes == 8)
 			DieWithErr("server-side file error");
 
-		fwrite(rcvBuf, 1, numBytes, musicFile);
-		fileSize = *((int64_t *)rcvBuf);
-		printf("Receiving file of size %lu\n", fileSize);
 		bytesRec += numBytes;
 
+		fwrite(rcvBuf+sizeof(int64_t), sizeof(char), bytesRec-sizeof(int64_t), musicFile);
+
+		fileSize = *((int64_t *)rcvBuf);
+		printf("Receiving file of size %lu\n", fileSize);
+
 		while (bytesRec < sizeof(int64_t) + fileSize)
-		{
-			//printf("%u | %lu\n", bytesRec, *fileSize);
-			fseek(musicFile, bytesRec, SEEK_SET);
-			
+		{			
     		memset(rcvBuf, 0, sizeof(rcvBuf));
 
 			numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
@@ -143,7 +138,8 @@ int pull()
         	else if (numBytes == 0)
             	DieWithErr("recv() connection closed prematurely");
 
-			fwrite(rcvBuf, 1, numBytes, musicFile);    
+			//fseek(musicFile, bytesRec-sizeof(int64_t), SEEK_SET);
+			fwrite(rcvBuf, sizeof(char), numBytes, musicFile);    
         	bytesRec += numBytes;
         
     	}

@@ -111,24 +111,21 @@ int pull()
 		musicFile = fopen(mostRecentDiff->items[i]->filename, "wb");
 
 		unsigned int bytesRec = 0;
-		int64_t fileSize = -1;
+		int64_t fileSize ;
 
-		numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
+		numBytes = recv(clientSock, &fileSize, sizeof(int64_t), 0);
 		if (numBytes < 0)
             DieWithErr("recv() failed");
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
-		else if (numBytes == 8)
-			DieWithErr("server-side file error");
 
-		bytesRec += numBytes;
+		//numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
+		//bytesRec += numBytes;
 
-		fwrite(rcvBuf+sizeof(int64_t), sizeof(char), bytesRec-sizeof(int64_t), musicFile);
-
-		fileSize = *((int64_t *)rcvBuf);
+		//fileSize = *((int64_t *)rcvBuf);
 		printf("Receiving file of size %lu\n", fileSize);
 
-		while (bytesRec < sizeof(int64_t) + fileSize)
+		while (bytesRec < fileSize)
 		{			
     		memset(rcvBuf, 0, sizeof(rcvBuf));
 
@@ -138,8 +135,8 @@ int pull()
         	else if (numBytes == 0)
             	DieWithErr("recv() connection closed prematurely");
 
-			//fseek(musicFile, bytesRec-sizeof(int64_t), SEEK_SET);
-			fwrite(rcvBuf, sizeof(char), numBytes, musicFile);    
+			fwrite(rcvBuf, sizeof(char), numBytes, musicFile);
+			
         	bytesRec += numBytes;
         
     	}

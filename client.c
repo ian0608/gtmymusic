@@ -115,7 +115,7 @@ int pull()
 		musicFile = fopen(mostRecentDiff->items[i]->filename, "wb");
 
 		unsigned int bytesRec = 0;
-		int64_t *fileSize = NULL;
+		int64_t fileSize = -1;
 
 		numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
 		if (numBytes < 0)
@@ -126,12 +126,13 @@ int pull()
 			DieWithErr("server-side file error");
 
 		fwrite(rcvBuf, 1, numBytes, musicFile);
-		fileSize = (int64_t *)rcvBuf;
-		printf("Receiving file of size %lu\n", *fileSize);
+		fileSize = *((int64_t *)rcvBuf);
+		printf("Receiving file of size %lu\n", fileSize);
 		bytesRec += numBytes;
 
-		while (bytesRec < sizeof(int64_t) + *fileSize)
+		while (bytesRec < sizeof(int64_t) + fileSize)
 		{
+			//printf("%u | %lu\n", bytesRec, *fileSize);
 			fseek(musicFile, bytesRec, SEEK_SET);
 			
     		memset(rcvBuf, 0, sizeof(rcvBuf));
@@ -173,21 +174,21 @@ int list()
     /* Receive and print response from the server */
     /*	    FILL IN	 */
     unsigned int bytesRec = 0;
-	int32_t *numItems = NULL;
+	int32_t numItems = -1;
 	
 	numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
 	if (numBytes < 0)
             DieWithErr("recv() failed");
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
-	numItems = (int32_t *)rcvBuf;
-	printf("Received %u items\n", *numItems);
+	numItems = *((int32_t *)rcvBuf);
+	printf("Received %u items\n", numItems);
 	bytesRec += numBytes;
 
-	unsigned char *listBuf = (unsigned char *)malloc(sizeof(int32_t) + (*numItems)*sizeof(list_item));
+	unsigned char *listBuf = (unsigned char *)malloc(sizeof(int32_t) + (numItems)*sizeof(list_item));
 	memcpy(listBuf, rcvBuf, numBytes);
 	
-    while (bytesRec < sizeof(int32_t) + (*numItems)*sizeof(list_item))
+    while (bytesRec < sizeof(int32_t) + (numItems)*sizeof(list_item))
 	{
     	memset(rcvBuf, 0, sizeof(rcvBuf));
 
@@ -205,7 +206,7 @@ int list()
 	if(init_list_item_array(&mostRecentList) < 0)
 		return -1;
 	int k;
-	for(k=0; k<*numItems; k++)
+	for(k=0; k<numItems; k++)
 	{
 		list_item *currentPtr = (list_item *)(listBuf+sizeof(int32_t)+(k*sizeof(list_item)));
 		if(incr_size_list_item_array(&mostRecentList) < 0)

@@ -30,6 +30,7 @@
 #define MAXPENDING 5
 
 
+
 void DieWithErr(char *errorMessage){
     printf("%s\n", errorMessage);
     exit(EXIT_FAILURE);
@@ -45,7 +46,8 @@ struct ThreadArgs {
 
 void *ThreadMain(void *args);
 void send_list(int clientSock);
-void pull_resp(int clinetSock, unsigned char hash[ARG2_SIZE]);
+void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]);
+void log(int socket, char *string);
 
 /* The main function */
 int main(int argc, char *argv[])
@@ -215,14 +217,15 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 		int j;
 		for (j=0; j < MD5_DIGEST_LENGTH; j++) {		
 		        if (memcmp(myList->items[i]->hash, hash, ARG2_SIZE) == 0) {
-			      printf("%s\n", myList->items[i]->filename);
+			      //printf("%s\n", myList->items[i]->filename);
 			      filename = myList->items[i]->filename;
 			}
-			printf("%02x", myList->items[i]->hash[j]);
+			//printf("%02x", myList->items[i]->hash[j]);
 		}
-		printf("\n");
+		//printf("\n");
 	}
 	printf("File: %s\n", filename);
+	log(clientSock, filename);
 
 
 	int64_t sendBuffSize;
@@ -291,50 +294,101 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 }
 
 void send_list(int clientSock) {
+	log(clientSock, "list");
+
 	char *sendBuff;
+	int32_t listCount; 	
+	size_t sendBuffSize;
+	ssize_t numBytesSent;
 	
 	list_item_array *myList = get_list_items_current_dir();
 
 	if (myList == NULL) {
 		Err("get_list_items_current_dir() failed");
+		sendBuffSize = sizeof(int32_t);
+		listCount = 0;
+		sendBuff = malloc(sendBuffSize);
+		if (sendBuff == NULL) {
+			Err("malloc failed");
+		}
+		memcpy(sendBuff, &listCount, sizeof(int32_t));
+		printf("SENDING LIST ITEMS\n");
+		/* Send file to client */
+		/*	FILL IN	  */
+	   	numBytesSent = 0;
+	    
+	    	while (numBytesSent < sendBuffSize) {
+			numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
+			printf("Number of bytes sent %zu\n", numBytesSent);
+	    	}
+
+		free(sendBuff);
 	}
+	else {
 	
 		
 
-	int32_t listCount = myList->count;
-	size_t sendBuffSize = sizeof(int32_t) + sizeof(list_item)*listCount;
-	printf("Send Buffer Size: %zu\n", sendBuffSize);
-	sendBuff = malloc(sendBuffSize);
+		listCount = myList->count;
+		sendBuffSize = sizeof(int32_t) + sizeof(list_item)*listCount;
+		printf("Send Buffer Size: %zu\n", sendBuffSize);
+		sendBuff = malloc(sendBuffSize);
 	
-	memcpy(sendBuff, &listCount, sizeof(int32_t));
-	int i=0;
+		memcpy(sendBuff, &listCount, sizeof(int32_t));
+		int i=0;
 
-	while (i < listCount)	//for each list_item
-	{	
-		printf("i: %i\n",i);
-		printf("List Item Name: %s\n", myList->items[i]->filename);
-		int j = 0;
-		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
-			printf("%02x", myList->items[i]->hash[j]);
-		printf("\n");
-		memcpy(sendBuff + sizeof(int32_t) + i*sizeof(list_item), myList->items[i], sizeof(list_item));
-    		i++;
-	}
-	printf("SENDING LIST ITEMS\n");
-	/* Send file to client */
-	/*	FILL IN	  */
-   	ssize_t numBytesSent = 0;
-    
-    	while (numBytesSent < sendBuffSize) {
-        	numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
-        	printf("Number of bytes sent %zu\n", numBytesSent);
+		while (i < listCount)	//for each list_item
+		{	
+			printf("i: %i\n",i);
+			printf("List Item Name: %s\n", myList->items[i]->filename);
+			int j = 0;
+			for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
+				printf("%02x", myList->items[i]->hash[j]);
+			printf("\n");
+			memcpy(sendBuff + sizeof(int32_t) + i*sizeof(list_item), myList->items[i], sizeof(list_item));
+	    		i++;
+		}
+		printf("SENDING LIST ITEMS\n");
+		/* Send file to client */
+		/*	FILL IN	  */
+	   	numBytesSent = 0;
+	    
+	    	while (numBytesSent < sendBuffSize) {
+			numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
+			printf("Number of bytes sent %zu\n", numBytesSent);
+	    	}
+
+		free(sendBuff);
+
     	}
-
-	free(sendBuff);
-
-    
     
 }
 
 
- 
+ void log(int socket, char *string) {
+
+	char * hostip = 0;
+	struct sockaddr_in addr;
+	socklen_t addr_len = sizeof(addr);
+	int err = getpeername(socket, (struct sockaddr *) &addr, &addr_len);
+	if (err != 0) {
+   		// error
+	}
+	else {
+		time_t ltime; /* calendar time */
+	    	ltime=time(NULL); /* get current cal time */
+	  
+
+		hostip = inet_ntoa(addr.sin_addr);
+
+		printf("IP: %s    Accessed Item: %s\n", hostip, string); 
+
+		FILE * fp;
+
+	   	fp = fopen ("log.txt", "a+");
+	   	fprintf(fp, "IP: %s    Accessed Item: %s     Time: %s\n", hostip, string, asctime(localtime(&ltime)));
+	   
+	   	fclose(fp);
+	}
+
+
+}

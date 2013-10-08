@@ -32,6 +32,9 @@ char sndBuf[SNDBUFSIZE];	    /* Send Buffer */
 unsigned char rcvBuf[RCVBUFSIZE];	    /* Receive Buffer */
 unsigned short servPort = 6079;
 
+list_item_array *mostRecentList = NULL;
+list_item_array *mostRecentDiff = NULL;
+
 int f1;
 
 void DieWithErr(char *errorMessage){
@@ -40,11 +43,101 @@ void DieWithErr(char *errorMessage){
 }
 
 
+int diff()
+{
+	list_item_array *currentDirItems = get_list_items_current_dir();
+	if (currentDirItems == NULL)
+	{
+		return -1;
+	}
+	mostRecentDiff = diff_lists(mostRecentList, currentDirItems);
+	if (mostRecentDiff == NULL)
+	{
+		return -1;
+	}
+	
+	teardown_list_item_array(currentDirItems);
+
+	printf("diff result:\n");
+	int i=0;
+	while (i < mostRecentDiff->count)	//for each list_item
+	{
+		printf("%s\n", mostRecentDiff->items[i]->filename);	//print the filename
+		int j;
+		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
+			printf("%02x", mostRecentDiff->items[i]->hash[j]);
+		printf("\n");
+		i++;
+	}
+	return 0;
+}
+
+int pull()
+{
+	//iterate through most recent diff
+	int i=0;
+	while (i < mostRecentDiff->count)	//for each list_item in most recent diff (what client doesn't have)
+	{
+		memset(rcvBuf, 0, sizeof(rcvBuf));
+
+		printf("Pulling file from server: %s \n", mostRecentDiff->items[i]->filename);
+
+		char pullStr[] = "PULL ";
+		char* pullCmd[strlen(pullStr) + MD5_DIGEST_LENGTH];
+		memcpy(pullCmd, pullStr, strlen(pullStr));	//no null-terminator
+		memcpy(pullCmd+strlen(pullStr), mostRecentDiff->items[i]->hash, MD5_DIGEST_LENGTH);
+    	
+		size_t cmdLen = strlen(pullStr) + MD5_DIGEST_LENGTH;
+		ssize_t numBytes = send(clientSock, pullCmd, cmdLen, 0);
+    	if (numBytes < 0)
+        	DieWithErr("send() failed");
+    	else if (numBytes != cmdLen)
+        	DieWithErr("send() sent unexpected number of bytes");
+		
+		FILE *musicFile;
+		musicFile = fopen(mostRecentDiff->items[i]->filename, "rb+");
+
+		unsigned int bytesRec = 0;
+		int64_t *fileSize = NULL;
+
+		numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
+		if (numBytes < 0)
+            DieWithErr("recv() failed");
+        else if (numBytes == 0)
+            DieWithErr("recv() connection closed prematurely");
+
+		fwrite(rcvBuf, 1, numBytes, musicFile);
+
+		fileSize = (int64_t *)rcvBuf;
+		printf("Receiving file of size %lu\n", *fileSize);
+		bytesRec += numBytes;
+
+		while (bytesRec < sizeof(int64_t) + *fileSize)
+		{
+			fseek(musicFile, bytesRec, SEEK_SET);
+			
+    		memset(rcvBuf, 0, sizeof(rcvBuf));
+
+			numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
+        	if (numBytes < 0)
+            	DieWithErr("recv() failed");
+        	else if (numBytes == 0)
+            	DieWithErr("recv() connection closed prematurely");
+
+			fwrite(rcvBuf, 1, numBytes, musicFile);    
+        	bytesRec += numBytes;
+        
+    	}
+
+		i++;
+
+		fclose(musicFile);
+	}
+	return 0;
+}
+
 int list()
 {
-	// Clear the buffers
-    memset(sndBuf, 0, sizeof(sndBuf));
-    memset(rcvBuf, 0, sizeof(rcvBuf));
 
 /* Send the string to the server */
     /*	    FILL IN	 */
@@ -72,26 +165,31 @@ int list()
 	numItems = (int32_t *)rcvBuf;
 	printf("Received %u items\n", *numItems);
 	bytesRec += numBytes;
+
+	unsigned char *listBuf = (unsigned char *)malloc(sizeof(int32_t) + (*numItems)*sizeof(list_item));
+	memcpy(listBuf, rcvBuf, numBytes);
 	
     while (bytesRec < sizeof(int32_t) + (*numItems)*sizeof(list_item))
 	{
-		numBytes = recv(clientSock, rcvBuf + bytesRec, RCVBUFSIZE - bytesRec, 0);
+    	memset(rcvBuf, 0, sizeof(rcvBuf));
+
+		numBytes = recv(clientSock, rcvBuf, RCVBUFSIZE, 0);
         if (numBytes < 0)
             DieWithErr("recv() failed");
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
-        
+
+		memcpy(listBuf+bytesRec, rcvBuf, numBytes);        
         bytesRec += numBytes;
         
     }
 
-	list_item_array *mostRecentList;
 	if(init_list_item_array(&mostRecentList) < 0)
 		return -1;
 	int k;
 	for(k=0; k<*numItems; k++)
 	{
-		list_item *currentPtr = (list_item *)(rcvBuf+sizeof(int32_t)+(k*sizeof(list_item)));
+		list_item *currentPtr = (list_item *)(listBuf+sizeof(int32_t)+(k*sizeof(list_item)));
 		if(incr_size_list_item_array(&mostRecentList) < 0)
 			return -1;
 		memcpy(mostRecentList->items[mostRecentList->count-1]->hash, currentPtr->hash, MD5_DIGEST_LENGTH);
@@ -110,8 +208,6 @@ int list()
 	}
 	return 0; 
 }
-
-
 
 /* The main function */
 int main(int argc, char *argv[])
@@ -142,6 +238,10 @@ int main(int argc, char *argv[])
     
 	for(;;)
 	{
+		// Clear the buffers
+    	memset(sndBuf, 0, sizeof(sndBuf));
+    	memset(rcvBuf, 0, sizeof(rcvBuf));
+
 		printf("Enter command.\n");
 		int inputCtr = 0;
 		char userCmd[7];
@@ -162,6 +262,26 @@ int main(int argc, char *argv[])
 			printf("User entered LIST\n");
 			if (list() < 0)
 				printf("LIST failed\n");
+		}
+		else if (strcmp(userCmd, "DIFF") == 0)
+		{
+			printf("User entered DIFF\n");
+			if (mostRecentList == NULL)
+			{
+				printf("Must run LIST first\n");
+			}
+			else if (diff() < 0)
+				printf("DIFF failed\n");
+		}
+		else if (strcmp(userCmd, "PULL") == 0)
+		{
+			printf("User entered PULL\n");
+			if (mostRecentDiff == NULL)
+			{
+				printf("Must run DIFF first\n");
+			}
+			else if (pull() < 0)
+				printf("PULL failed\n");
 		}
 	}   
     

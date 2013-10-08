@@ -25,7 +25,12 @@
 #define SNDBUFSIZE 10000		    /* The send buffer size */
 #define MDLEN 32
 
-
+int clientSock;		    /* socket descriptor */
+struct sockaddr_in serv_addr;   /* The server address */
+    
+char sndBuf[SNDBUFSIZE];	    /* Send Buffer */
+unsigned char rcvBuf[RCVBUFSIZE];	    /* Receive Buffer */
+unsigned short servPort = 6079;
 
 int f1;
 
@@ -34,44 +39,14 @@ void DieWithErr(char *errorMessage){
     exit(EXIT_FAILURE);
 }
 
-/* The main function */
-int main(int argc, char *argv[])
+
+int list()
 {
-    
-    int clientSock;		    /* socket descriptor */
-    struct sockaddr_in serv_addr;   /* The server address */
-    
-    char sndBuf[SNDBUFSIZE];	    /* Send Buffer */
-    unsigned char rcvBuf[RCVBUFSIZE];	    /* Receive Buffer */
-    unsigned short servPort = 6079;
-    
-    //int i;			    /* Counter Value */
-    
-    // Clear the buffers
+	// Clear the buffers
     memset(sndBuf, 0, sizeof(sndBuf));
     memset(rcvBuf, 0, sizeof(rcvBuf));
 
-    
-    /* Create a new TCP socket*/
-    /*	    FILL IN	*/
-    clientSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (clientSock < 0)
-        DieWithErr("socket() failed");
-    
-    /* Construct the server address structure */
-    /*	    FILL IN	 */
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("130.207.114.22");
-    serv_addr.sin_port = htons(servPort);
-    
-    /* Establish connecction to the server */
-    /*	    FILL IN	 */
-    if (connect(clientSock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-        DieWithErr("connect() failed");
-    
-    
-    /* Send the string to the server */
+/* Send the string to the server */
     /*	    FILL IN	 */
 
 	char* listCmd = "LIST";
@@ -132,14 +107,63 @@ int main(int argc, char *argv[])
 			printf("%02x", mostRecentList->items[k]->hash[j]);
 		printf("\n");
 		k++;
-	}    
+	}
+	return 0; 
+}
+
+
+
+/* The main function */
+int main(int argc, char *argv[])
+{
     
+    // Clear the buffers
+    memset(sndBuf, 0, sizeof(sndBuf));
+    memset(rcvBuf, 0, sizeof(rcvBuf));
+
     
-    /*
-    for(i = 0; i < RCVBUFSIZE; i++)
-        printf("%c", rcvBuf[i]);
-    printf("\n");
-    */
+    /* Create a new TCP socket*/
+    /*	    FILL IN	*/
+    clientSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (clientSock < 0)
+        DieWithErr("socket() failed");
+    
+    /* Construct the server address structure */
+    /*	    FILL IN	 */
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = inet_addr("130.207.114.22");
+    serv_addr.sin_port = htons(servPort);
+    
+    /* Establish connecction to the server */
+    /*	    FILL IN	 */
+    if (connect(clientSock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+        DieWithErr("connect() failed");
+    
+	for(;;)
+	{
+		printf("Enter command.\n");
+		int inputCtr = 0;
+		char userCmd[7];
+		for(;;)
+		{
+			if (inputCtr >= 6) break;
+			char current = getchar();
+			if (current == EOF || current == '\n') break;
+			userCmd[inputCtr] = current;
+			inputCtr++;
+		}
+		userCmd[inputCtr] = '\0';
+		//allow for six characters plus null terminator so that extra characters after the longest command
+		//will invalidate that input
+
+		if (strcmp(userCmd, "LIST") == 0)
+		{
+			printf("User entered LIST\n");
+			if (list() < 0)
+				printf("LIST failed\n");
+		}
+	}   
     
     return 0; 
 }

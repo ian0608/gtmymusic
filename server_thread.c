@@ -118,15 +118,18 @@ void *ThreadMain(void *threadArgs) {
     char clientArg1[ARG1_SIZE];
     unsigned char clientArg2[ARG2_SIZE];
     
-    // Clear the buffers
-    memset(clientRequest, 0, CLNT_REQ_BUFSIZE);
-    memset(clientArg1, 0, ARG1_SIZE);
-    memset(clientArg2, 0, ARG2_SIZE);
-    
     // Setup Pthread & get the args
     pthread_detach(pthread_self());
     clientSock = ((struct ThreadArgs *) threadArgs)->clntSock;
     free(threadArgs);
+
+//LOOP FOR CLIENT REQUESTS
+while(1) {
+
+    // Clear the buffers
+    memset(clientRequest, 0, CLNT_REQ_BUFSIZE);
+    memset(clientArg1, 0, ARG1_SIZE);
+    memset(clientArg2, 0, ARG2_SIZE);
     
     unsigned int numBytesRecvd = 0;
     /* Extract CLIENT REQUEST ARG 1 from the packet, store in clientRequest, arg1*/ 
@@ -168,11 +171,16 @@ void *ThreadMain(void *threadArgs) {
 	printf("LIST\n");
         send_list(clientSock);
     }
+    else if((memcmp(clientArg1, "QUIT", ARG1_SIZE)) == 0) {
+	close(clientSock);
+	return(NULL);
+    }
     else {
         printf("NOT A VALID REQUEST\n");
     }
-    
-    return (NULL);
+}
+
+	
 }
 
 void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
@@ -246,9 +254,6 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
     	    	printf("Number of bytes sent %zu\n", numBytesSent);
     	}
     
-
-    
-    	close(clientSock);
     	free(sendBuff);
 
 	
@@ -296,7 +301,6 @@ void send_list(int clientSock) {
 
 	free(sendBuff);
 
-	close(clientSock);
     
     
 }

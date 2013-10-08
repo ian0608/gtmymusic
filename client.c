@@ -56,10 +56,21 @@ int diff()
 		return -1;
 	}
 	
-	teardown_list_item_array(currentDirItems);
+
+	printf("current directory contents:\n");
+	int i=0;
+	while (i < currentDirItems->count)	//for each list_item
+	{
+		printf("%s\n", currentDirItems->items[i]->filename);	//print the filename
+		int j;
+		for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
+			printf("%02x", currentDirItems->items[i]->hash[j]);
+		printf("\n");
+		i++;
+	}
 
 	printf("diff result:\n");
-	int i=0;
+	i=0;
 	while (i < mostRecentDiff->count)	//for each list_item
 	{
 		printf("%s\n", mostRecentDiff->items[i]->filename);	//print the filename
@@ -69,6 +80,8 @@ int diff()
 		printf("\n");
 		i++;
 	}
+
+	teardown_list_item_array(currentDirItems);
 	return 0;
 }
 
@@ -83,10 +96,14 @@ int pull()
 		printf("Pulling file from server: %s \n", mostRecentDiff->items[i]->filename);
 
 		char pullStr[] = "PULL ";
-		char* pullCmd[strlen(pullStr) + MD5_DIGEST_LENGTH];
+		char pullCmd[strlen(pullStr) + MD5_DIGEST_LENGTH];
 		memcpy(pullCmd, pullStr, strlen(pullStr));	//no null-terminator
 		memcpy(pullCmd+strlen(pullStr), mostRecentDiff->items[i]->hash, MD5_DIGEST_LENGTH);
     	
+		int p;
+		for (p = 0; p < MD5_DIGEST_LENGTH; p++)
+    			printf("%02x", pullCmd[strlen(pullStr)+p] );
+
 		size_t cmdLen = strlen(pullStr) + MD5_DIGEST_LENGTH;
 		ssize_t numBytes = send(clientSock, pullCmd, cmdLen, 0);
     	if (numBytes < 0)
@@ -95,7 +112,7 @@ int pull()
         	DieWithErr("send() sent unexpected number of bytes");
 		
 		FILE *musicFile;
-		musicFile = fopen(mostRecentDiff->items[i]->filename, "rb+");
+		musicFile = fopen(mostRecentDiff->items[i]->filename, "wb");
 
 		unsigned int bytesRec = 0;
 		int64_t *fileSize = NULL;
@@ -105,9 +122,10 @@ int pull()
             DieWithErr("recv() failed");
         else if (numBytes == 0)
             DieWithErr("recv() connection closed prematurely");
+		else if (numBytes == 8)
+			DieWithErr("server-side file error");
 
 		fwrite(rcvBuf, 1, numBytes, musicFile);
-
 		fileSize = (int64_t *)rcvBuf;
 		printf("Receiving file of size %lu\n", *fileSize);
 		bytesRec += numBytes;

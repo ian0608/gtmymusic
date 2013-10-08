@@ -264,7 +264,7 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 	    	if (newLen == 0) {
 			Err("File I/O err: fread() failed");
 	    	} else {
-	    	    	sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
+	    	    	//sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
 	    	}
 	}
 	else{

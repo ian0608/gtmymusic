@@ -26,7 +26,7 @@
 		
 #define ARG1_SIZE 4
 #define ARG2_SIZE MD5_DIGEST_LENGTH
-#define CLNT_REQ_BUFSIZE ARG1_SIZE + 1 + ARG2_SIZE +1 /* The client request should be 22 bytes long*/
+#define CLNT_REQ_BUFSIZE ARG1_SIZE + 1 + ARG2_SIZE /* The client request should be 21 bytes long*/
 #define MAXPENDING 5
 
 

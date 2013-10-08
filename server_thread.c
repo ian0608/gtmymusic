@@ -35,6 +35,10 @@ void DieWithErr(char *errorMessage){
     exit(EXIT_FAILURE);
 }
 
+void Err(char *errorMessage) {
+    printf("%s\n", errorMessage);
+}
+
 struct ThreadArgs {
     int clntSock;
 };
@@ -138,10 +142,14 @@ while(1) {
     /* Extract CLIENT REQUEST ARG 1 from the packet, store in clientRequest, arg1*/ 
     while (numBytesRecvd < ARG1_SIZE) {
     	numBytesRecvd += recv(clientSock, clientRequest + numBytesRecvd, CLNT_REQ_BUFSIZE, 0);
-   	if (numBytesRecvd < 0)
-        	DieWithErr("recv() failed");
-    	else if (numBytesRecvd == 0)
-		DieWithErr("recv() closed prematurely");
+   	if (numBytesRecvd < 0) {
+        	Err("recv() failed");
+		return(NULL);
+	}
+    	else if (numBytesRecvd == 0){
+		Err("recv() closed prematurely");
+		return(NULL);
+	}
     }
 //
     printf("Client Request: %s\n", clientRequest);
@@ -154,10 +162,14 @@ while(1) {
 	    	/* Extract CLIENT REQUEST from the packet, store in clientRequest, arg1 and arg2 */ 
 	    	while (numBytesRecvd < CLNT_REQ_BUFSIZE) {
 	    		numBytesRecvd += recv(clientSock, clientRequest + numBytesRecvd, CLNT_REQ_BUFSIZE, 0);
-   			if (numBytesRecvd < 0)
-				DieWithErr("recv() failed");
-	    		else if (numBytesRecvd == 0)
-				DieWithErr("recv() closed prematurely");
+   			if (numBytesRecvd < 0) {
+				Err("recv() failed");
+				return(NULL);
+			}
+	    		else if (numBytesRecvd == 0) {
+				Err("recv() closed prematurely");
+				return(NULL);
+			}
 	    	}
 	    	clientReqp = clientRequest;
     		memcpy(clientArg2, clientReqp + ARG1_SIZE + 1, (size_t) ARG2_SIZE);
@@ -192,7 +204,7 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 	
 	list_item_array *myList = get_list_items_current_dir();
 	if (myList == NULL) {
-		DieWithErr("get_list_items_current_dir() failed");
+		Err("get_list_items_current_dir() failed");
 	}
     
 	int listCount = myList->count;
@@ -212,7 +224,7 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 	int64_t fileSize;
 	    /* OPEN FILE */
    	if ((file1 = fopen("04 Son's Gonna Rise.mp3", "r")) == NULL){
-      		DieWithErr("File I/O err: fopen() failed");
+      		Err("File I/O err: fopen() failed");
     	}
     
     	/* COMPUTE FILE SIZE */
@@ -220,20 +232,20 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 		fileSize = ftell(file1);
         	sendBuffSize = fileSize + sizeof(int64_t);
        		if (sendBuffSize == -1) {
-            		DieWithErr("ftell() failed to SEEK_END");
-        	}
+            		Err("ftell() failed to SEEK_END");
+		}
         	printf("sendBuffSize: %" PRId64 " bytes \n", sendBuffSize);
     	}
 	else {
-        	DieWithErr("fseek() failed failed to SEEK_END");
-    	}
+        	Err("fseek() failed failed to SEEK_END");
+	}
     
     	sendBuff = malloc(sendBuffSize);
     	if (sendBuff == NULL) {
-        	DieWithErr("malloc() failed");
+        	Err("malloc() failed");
     	}
     	if (fseek(file1, 0, SEEK_SET) != 0) {
-        	DieWithErr("fseek() failed to SEEK_SET");
+        	Err("fseek() failed to SEEK_SET");
     	}
     
   
@@ -243,7 +255,7 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
     	/* READ FILE TO BUFFER*/
     	size_t newLen = fread(sendBuff + sizeof(int64_t), sizeof(char), fileSize, file1);
     	if (newLen == 0) {
-        	DieWithErr("File I/O err: fread() failed");
+        	Err("File I/O err: fread() failed");
     	} else {
     	    	sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
     	}
@@ -268,7 +280,7 @@ void send_list(int clientSock) {
 	list_item_array *myList = get_list_items_current_dir();
 
 	if (myList == NULL) {
-		DieWithErr("get_list_items_current_dir() failed");
+		Err("get_list_items_current_dir() failed");
 	}
 	
 		

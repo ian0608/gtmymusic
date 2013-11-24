@@ -33,6 +33,7 @@ pthread_mutex_t logLock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
+
 void DieWithErr(char *errorMessage){
     printf("%s\n", errorMessage);
     exit(EXIT_FAILURE);
@@ -49,7 +50,11 @@ struct ThreadArgs {
 void *ThreadMain(void *args);
 void send_list(int clientSock);
 void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]);
+<<<<<<< HEAD
 void logger(int socket, char *string);
+=======
+void log(int socket, char *string);
+>>>>>>> 5418d72fbe570b2a7fcc2bf5c2d44c5171897f94
 
 /* The main function */
 int main(int argc, char *argv[])
@@ -227,7 +232,11 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 		//printf("\n");
 	}
 	printf("File: %s\n", filename);
+<<<<<<< HEAD
 	logger(clientSock, filename);
+=======
+	log(clientSock, filename);
+>>>>>>> 5418d72fbe570b2a7fcc2bf5c2d44c5171897f94
 
 
 	int64_t sendBuffSize;
@@ -296,7 +305,11 @@ void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
 }
 
 void send_list(int clientSock) {
+<<<<<<< HEAD
 	logger(clientSock, "list");
+=======
+	log(clientSock, "list");
+>>>>>>> 5418d72fbe570b2a7fcc2bf5c2d44c5171897f94
 
 	char *sendBuff;
 	int32_t listCount; 	
@@ -366,7 +379,11 @@ void send_list(int clientSock) {
 }
 
 
+<<<<<<< HEAD
  void logger(int socket, char *string) {
+=======
+ void log(int socket, char *string) {
+>>>>>>> 5418d72fbe570b2a7fcc2bf5c2d44c5171897f94
 
 	char * hostip = 0;
 	struct sockaddr_in addr;
@@ -383,14 +400,18 @@ void send_list(int clientSock) {
 		hostip = inet_ntoa(addr.sin_addr);
 
 		printf("IP: %s    Accessed Item: %s\n", hostip, string); 
+<<<<<<< HEAD
 		
 		pthread_mutex_lock(&logLock);
+=======
+>>>>>>> 5418d72fbe570b2a7fcc2bf5c2d44c5171897f94
 
 		FILE * fp;
 
 	   	fp = fopen ("log.txt", "a+");
 	   	fprintf(fp, "IP: %s    Accessed Item: %s     Time: %s\n", hostip, string, asctime(localtime(&ltime)));
 	   
+<<<<<<< HEAD
 	   	fclose(fp);	
 
 		pthread_mutex_unlock(&logLock);
@@ -398,4 +419,10 @@ void send_list(int clientSock) {
 
 
 
+=======
+	   	fclose(fp);
+	}
+
+
+>>>>>>> 5418d72fbe570b2a7fcc2bf5c2d44c5171897f94
 }

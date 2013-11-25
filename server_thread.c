@@ -21,12 +21,14 @@
 #include <fcntl.h>
 #include <openssl/md5.h>
 #include <inttypes.h>
+//#include <libxml/parser.h>
 #include "gtmymusic.h"
 
 		
 #define ARG1_SIZE 4
 #define ARG2_SIZE MD5_DIGEST_LENGTH
 #define CLNT_REQ_BUFSIZE ARG1_SIZE + 1 + ARG2_SIZE /* The client request should be 21 bytes long*/
+#define FILENAME_LENGTH 257
 #define MAXPENDING 5
 
 pthread_mutex_t logLock = PTHREAD_MUTEX_INITIALIZER;
@@ -48,6 +50,7 @@ struct ThreadArgs {
 
 void *ThreadMain(void *args);
 void send_list(int clientSock);
+void send_list2(int clientSock);
 void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]);
 void logger(int socket, char *string);
 
@@ -188,7 +191,10 @@ while(1) {
     }
     else if((memcmp(clientArg1, "LIST", ARG1_SIZE)) == 0) {
 	//printf("LIST\n");
-        send_list(clientSock);
+        send_list2(clientSock);
+    }
+    else if ((memcmp(clientArg1, "CAP ", ARG1_SIZE)) == 0) {
+
     }
     else if((memcmp(clientArg1, "QUIT", ARG1_SIZE)) == 0) {
 	close(clientSock);
@@ -347,6 +353,78 @@ void send_list(int clientSock) {
 				printf("%02x", myList->items[i]->hash[j]);
 			printf("\n");
 			memcpy(sendBuff + sizeof(int32_t) + i*sizeof(list_item), myList->items[i], sizeof(list_item));
+	    		i++;
+		}
+		printf("SENDING LIST ITEMS\n");
+		/* Send file to client */
+		/*	FILL IN	  */
+	   	numBytesSent = 0;
+	    
+	    	while (numBytesSent < sendBuffSize) {
+			numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
+			printf("Number of bytes sent %zu\n", numBytesSent);
+	    	}
+
+		free(sendBuff);
+
+    	}
+    
+}
+
+void send_list2(int clientSock) {
+	logger(clientSock, "list");
+
+	char *sendBuff;
+	int32_t listCount; 	
+	size_t sendBuffSize;
+	ssize_t numBytesSent;
+	
+	list_item_array *myList = get_list_items_current_dir();
+
+	if (myList == NULL) {
+		Err("get_list_items_current_dir() failed");
+		sendBuffSize = sizeof(int32_t);
+		listCount = 0;
+		sendBuff = malloc(sendBuffSize);
+		if (sendBuff == NULL) {
+			Err("malloc failed");
+		}
+		memcpy(sendBuff, &listCount, sizeof(int32_t));
+		printf("SENDING LIST ITEMS\n");
+		/* Send file to client */
+		/*	FILL IN	  */
+	   	numBytesSent = 0;
+	    
+	    	while (numBytesSent < sendBuffSize) {
+			numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
+			printf("Number of bytes sent %zu\n", numBytesSent);
+	    	}
+
+		free(sendBuff);
+	}
+	else {
+	
+		
+
+		listCount = myList->count;
+		sendBuffSize = sizeof(int32_t) + (MD5_DIGEST_LENGTH + FILENAME_LENGTH)*listCount;
+		printf("Send Buffer Size: %zu\n", sendBuffSize);
+		sendBuff = malloc(sendBuffSize);
+	
+		memcpy(sendBuff, &listCount, sizeof(int32_t));
+		int i=0;
+
+		while (i < listCount)	//for each list_item
+		{	
+			printf("i: %i\n",i);
+			printf("List Item Name: %s\n", myList->items[i]->filename);
+			int j = 0;
+			for (j=0; j < MD5_DIGEST_LENGTH; j++)				//and print the hash
+				printf("%02x", myList->items[i]->hash[j]);
+			printf("\n");
+			memcpy(sendBuff + sizeof(int32_t) + i*(MD5_DIGEST_LENGTH + FILENAME_LENGTH), myList->items[i]->hash, MD5_DIGEST_LENGTH);
+			memcpy(sendBuff + sizeof(int32_t) + i*(MD5_DIGEST_LENGTH + FILENAME_LENGTH) + MD5_DIGEST_LENGTH, myList->items[i]->filename, FILENAME_LENGTH);
+			
 	    		i++;
 		}
 		printf("SENDING LIST ITEMS\n");

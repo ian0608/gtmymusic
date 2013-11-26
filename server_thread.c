@@ -411,7 +411,8 @@ void send_list2(int clientSock) {
 		printf("Send Buffer Size: %zu\n", sendBuffSize);
 		sendBuff = malloc(sendBuffSize);
 	
-		memcpy(sendBuff, &listCount, sizeof(int32_t));
+		int32_t listCountNetwork = htonl(listCount);
+		memcpy(sendBuff, &listCountNetwork, sizeof(int32_t));
 		int i=0;
 
 		while (i < listCount)	//for each list_item

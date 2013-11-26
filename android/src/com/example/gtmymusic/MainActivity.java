@@ -122,7 +122,7 @@ public class MainActivity extends Activity {
                 	}
 
                 	//bb = ByteBuffer.wrap(itemBytes, 16, nullTerm-16);
-                	//builder.append(new String(bb.array()));
+                	//builder.append(new String(bb.array()));	//no... uses full backing array
                 	byte[] filenameBytes = new byte[nullTerm-16];
                 	System.arraycopy(itemBytes, 16, filenameBytes, 0, nullTerm-16);
                 	builder.append(new String(filenameBytes));

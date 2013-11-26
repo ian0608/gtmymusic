@@ -424,7 +424,10 @@ void send_list2(int clientSock) {
 				printf("%02x", myList->items[i]->hash[j]);
 			printf("\n");
 			memcpy(sendBuff + sizeof(int32_t) + i*(MD5_DIGEST_LENGTH + FILENAME_LENGTH), myList->items[i]->hash, MD5_DIGEST_LENGTH);
-			memcpy(sendBuff + sizeof(int32_t) + i*(MD5_DIGEST_LENGTH + FILENAME_LENGTH) + MD5_DIGEST_LENGTH, myList->items[i]->filename, FILENAME_LENGTH);
+			char filenameBuff[FILENAME_LENGTH];
+			memset(&filenameBuff, 0, FILENAME_LENGTH);
+			memcpy(filenameBuff, myList->items[i]->filename, strlen(myList->items[i]->filename));
+			memcpy(sendBuff + sizeof(int32_t) + i*(MD5_DIGEST_LENGTH + FILENAME_LENGTH) + MD5_DIGEST_LENGTH, filenameBuff, FILENAME_LENGTH);
 			
 	    		i++;
 		}

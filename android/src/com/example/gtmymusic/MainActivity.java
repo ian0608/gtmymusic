@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -34,10 +35,17 @@ public class MainActivity extends Activity {
 		new ListTask().execute();
 	}
 	
-	private class ListTask extends AsyncTask<Void, Void, Void>
+	public void displayMessage(String message)
+    {
+		TextView text = (TextView)findViewById(R.id.message_text);
+        text.setText(message);
+    }
+	
+	private class ListTask extends AsyncTask<Void, Void, String>
 	{
-		protected Void doInBackground(Void... params)
+		protected String doInBackground(Void... params)
 		{
+			String toReturn = "";
 			//NETWORKING GOES HERE
         	try {
         		Socket s = new Socket("130.207.114.22", 6079);
@@ -58,12 +66,14 @@ public class MainActivity extends Activity {
         		//read
                 //byte[] bytes = new byte[32];
                 byte[] countBytes = new byte[4];
-                stream.read(countBytes, 0, 4);
-                ByteBuffer wrapped = ByteBuffer.wrap(countBytes);
-                int count = wrapped.getInt();
+                int bytesRead = stream.read(countBytes, 0, 4);
+                ByteBuffer bb = ByteBuffer.wrap(countBytes);
+                bb.order(ByteOrder.BIG_ENDIAN);
+                int count = bb.getInt();
                 
-                TextView text = (TextView)findViewById(R.id.message_text);
-                text.setText(count);
+                //TextView text = (TextView)findViewById(R.id.message_text);
+                //text.setText(count + " items");
+                toReturn = bytesRead + " " + count;
                 
                 //Close connection
                 s.close();
@@ -76,8 +86,12 @@ public class MainActivity extends Activity {
         		e.printStackTrace();
         	}
 			
-			return null;
+			return toReturn;
 		}
+		
+		protected void onPostExecute(String result) {
+            displayMessage(result);
+        }
 	}
 
 }

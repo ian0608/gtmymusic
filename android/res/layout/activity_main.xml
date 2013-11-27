@@ -23,7 +23,8 @@
         <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/button_diff" />
+        android:text="@string/button_diff" 
+        android:onClick="diff" />
         
         <Button
         android:layout_width="wrap_content"

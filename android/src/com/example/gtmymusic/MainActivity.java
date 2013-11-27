@@ -22,8 +22,8 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
 	
-	private ArrayList<ListItem> mostRecentList = null;
-	private ArrayList<ListItem> mostRecentDiff = null;
+	private ListItemArray mostRecentList = null;
+	private ListItemArray mostRecentDiff = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +50,27 @@ public class MainActivity extends Activity {
 		
 		displayMessage("Files on server:\n");
 		new ListTask().execute();
+	}
+	
+	public void diff(View view)
+	{
+		if (mostRecentList == null)
+		{
+			displayMessage("Run LIST first");
+		}
+		else
+		{
+			ListItemArray current = itemsCurrentDir();
+			if (current == null)
+			{
+				displayMessage("Error getting current directory items");
+				return;
+			}
+			mostRecentDiff = diffArrays(mostRecentList, current);
+			displayMessage("Client is missing:\n\n");
+			appendMessage(mostRecentDiff.toString());
+			
+		}
 	}
 	
 	public void displayMessage(String message)
@@ -79,7 +100,22 @@ public class MainActivity extends Activity {
 	private ListItemArray diffArrays(ListItemArray authoritative, ListItemArray other)
 	{
 		ListItemArray diff = new ListItemArray();
-		
+		for(ListItem authoritativeItem : authoritative.array)
+		{
+			boolean found = false;
+			for(ListItem item : other.array)
+			{
+				if (authoritativeItem.hash.equals(item.hash) && authoritativeItem.filename.equals(item.filename))
+				{
+					found = true;
+					break;
+				}
+			}
+			if (found == false)
+			{
+				diff.addItem(new ListItem(authoritativeItem.hash, authoritativeItem.filename));
+			}
+		}
 		return diff;
 	}
 	
@@ -252,7 +288,8 @@ public class MainActivity extends Activity {
         		e.printStackTrace();
         	}
 			
-			return items.toString();
+        	mostRecentList = items;
+			return mostRecentList.toString();
 		}
 		
 		protected void onPostExecute(String result) {

@@ -1,11 +1,17 @@
 package com.example.gtmymusic;
 
 import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -15,6 +21,9 @@ import android.view.View;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
+	
+	private ArrayList<ListItem> mostRecentList = null;
+	private ArrayList<ListItem> mostRecentDiff = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -31,6 +40,15 @@ public class MainActivity extends Activity {
 	
 	public void list(View view)
 	{
+		/*
+		ListItemArray currentDir = itemsCurrentDir();
+		if (currentDir != null)
+			displayMessage(currentDir.toString());
+		else
+			displayMessage("error getting current directory items");
+		*/
+		
+		displayMessage("Files on server:\n");
 		new ListTask().execute();
 	}
 	
@@ -40,11 +58,111 @@ public class MainActivity extends Activity {
         text.setText(message);
     }
 	
+	public void appendMessage(String message)
+    {
+		TextView text = (TextView)findViewById(R.id.message_text);
+        text.setText(text.getText() + message);
+    }
+	
+	private class ListItem
+	{
+		public String hash;
+		public String filename;
+		
+		public ListItem(String h, String f)
+		{
+			hash = h;
+			filename = f;
+		}
+	}
+	
+	private ListItemArray diffArrays(ListItemArray authoritative, ListItemArray other)
+	{
+		ListItemArray diff = new ListItemArray();
+		
+		return diff;
+	}
+	
+	private ListItemArray itemsCurrentDir()
+	{
+		ListItemArray items = new ListItemArray();
+		File dir = getFilesDir();
+		for (File file : dir.listFiles()) {
+		    if (file.isFile())
+		    {
+		        String filename = file.getName();
+		        
+		        try {
+		        	FileInputStream fileIn = new FileInputStream(file);
+					MessageDigest digest = MessageDigest.getInstance("MD5");
+					DigestInputStream digestIn = new DigestInputStream(fileIn, digest);
+					byte[] buffer = new byte[8192];
+					while (digestIn.read(buffer) != -1)
+					{
+					}
+					digestIn.close();
+					byte[] hashBytes = digest.digest();
+					items.addItem(new ListItem(getHexString(hashBytes), filename));
+				} catch (Exception e) {
+					e.printStackTrace();
+					return null;
+				}
+		    }
+		}
+		
+		return items;
+	}
+	
+	private class ListItemArray
+	{
+		public ArrayList<ListItem> array;
+		
+		public ListItemArray()
+		{
+			array = new ArrayList<ListItem>();
+		}
+		
+		public String toString()
+		{
+			StringBuilder builder = new StringBuilder();
+			for(ListItem item : array)
+			{
+				builder.append(item.hash);
+				builder.append("\n");
+				builder.append(item.filename);
+				builder.append("\n\n");
+			}
+			return builder.toString();
+		}
+		
+		public void addItem(ListItem item)
+		{
+			array.add(item);
+		}
+	}
+
+	private String getHexString(byte[] bytesArray)
+	{
+		StringBuilder hexStringBuilder = new StringBuilder();
+    	for (int j=0; j<16; j++)
+        {
+        	//if (j==0 && itemBytes[j] < 16) builder.append("0");
+        	//builder.append(Integer.toHexString((int) (itemBytes[j] & 0xff)));
+    		String hex = Integer.toHexString((bytesArray[j] & 0xff));
+    		if (hex.length() == 1)
+    			hexStringBuilder.append('0');
+    		hexStringBuilder.append(hex);
+    		
+        }
+    	return hexStringBuilder.toString();
+	}
+	
 	private class ListTask extends AsyncTask<Void, Void, String>
 	{
 		protected String doInBackground(Void... params)
 		{
-			StringBuilder builder = new StringBuilder();
+			//StringBuilder builder = new StringBuilder();
+			ListItemArray items = new ListItemArray();
 			//NETWORKING GOES HERE
         	try {
         		Socket s = new Socket("130.207.114.22", 6079);
@@ -81,7 +199,6 @@ public class MainActivity extends Activity {
                 //toReturn = bytesRead + " " + count;
                 
                 
-                
                 for (int i=0; i < count; i++)
                 {
                 	byte[] itemBytes = new byte[273];
@@ -92,17 +209,9 @@ public class MainActivity extends Activity {
                 		return "Read unexpected number of item bytes";
                 	}
                 	
-                	for (int j=0; j<16; j++)
-                    {
-                    	//if (j==0 && itemBytes[j] < 16) builder.append("0");
-                    	//builder.append(Integer.toHexString((int) (itemBytes[j] & 0xff)));
-                		String hex = Integer.toHexString((itemBytes[j] & 0xff));
-                		if (hex.length() == 1)
-                			builder.append('0');
-                		builder.append(hex);
-                		
-                    }
-                	builder.append(", ");
+                	
+                	//builder.append(", ");
+                	String hexString = getHexString(itemBytes);
                 	
                 	int nullTerm = -1;
                 	
@@ -125,9 +234,11 @@ public class MainActivity extends Activity {
                 	//builder.append(new String(bb.array()));	//no... uses full backing array
                 	byte[] filenameBytes = new byte[nullTerm-16];
                 	System.arraycopy(itemBytes, 16, filenameBytes, 0, nullTerm-16);
-                	builder.append(new String(filenameBytes));
+                	//builder.append(new String(filenameBytes));
                 	
-                	builder.append("\n");
+                	//builder.append("\n");
+                	
+                	items.addItem(new ListItem(hexString, new String(filenameBytes)));
                 }
                 
                 //Close connection
@@ -141,11 +252,11 @@ public class MainActivity extends Activity {
         		e.printStackTrace();
         	}
 			
-			return builder.toString();
+			return items.toString();
 		}
 		
 		protected void onPostExecute(String result) {
-            displayMessage(result);
+            appendMessage(result);
         }
 	}
 

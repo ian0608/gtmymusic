@@ -37,12 +37,6 @@ list_item_array *mostRecentDiff = NULL;
 
 int f1;
 
-void DieWithErr(char *errorMessage){
-    printf("%s\n", errorMessage);
-    exit(EXIT_FAILURE);
-}
-
-
 int diff()
 {
 	list_item_array *currentDirItems = get_list_items_current_dir();
@@ -256,7 +250,7 @@ int main(int argc, char *argv[])
     /*	    FILL IN	 */
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("130.207.114.22");	//shuttle2
+    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");	//shuttle2
     serv_addr.sin_port = htons(servPort);
     
     /* Establish connecction to the server */
@@ -336,4 +330,3 @@ int main(int argc, char *argv[])
     
     return 0; 
 }
-

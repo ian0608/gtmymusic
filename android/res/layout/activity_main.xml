@@ -35,7 +35,8 @@
         <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/button_leave" />
+        android:text="@string/button_leave" 
+        android:onClick="leave"/>
         
 	</LinearLayout>
 	

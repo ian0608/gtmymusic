@@ -109,6 +109,18 @@ public class MainActivity extends Activity {
 		}
 	}
 	
+	public void leave(View view)
+	{
+		if (s != null)
+			try {
+				s.close();
+				displayMessage("Socket closed");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	}
+	
 	public void displayMessage(String message)
     {
 		TextView text = (TextView)findViewById(R.id.message_text);

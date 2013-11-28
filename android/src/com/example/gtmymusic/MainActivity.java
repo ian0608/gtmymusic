@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.app.Activity;
+import android.content.Context;
 import android.view.Menu;
 import android.view.View;
 import android.widget.EditText;
@@ -96,13 +97,13 @@ public class MainActivity extends Activity {
 	
 	public void pull(View view)
 	{
-		if (mostRecentList == null)
+		if (mostRecentDiff == null)
 		{
 			displayMessage("Run DIFF first");
 		}
 		else
 		{
-		//displayMessage("Files on server:\n");
+		displayMessage("Downloading:\n");
 			new PullTask().execute();
 		}
 	}
@@ -248,12 +249,11 @@ public class MainActivity extends Activity {
         		OutputStream out = s.getOutputStream();
         		
         		String command = "LIST";
-        		byte[] toSend = new byte[command.length() + 1];
+        		byte[] toSend = new byte[command.length()];
         		java.util.Arrays.fill(toSend, (byte)0);
         		
         		byte[] commandBytes = command.getBytes();
         		System.arraycopy(commandBytes, 0, toSend, 0, commandBytes.length);
-        		toSend[command.length()] = 0;	//last byte
         		
         		out.write(toSend);
         		
@@ -451,6 +451,9 @@ public class MainActivity extends Activity {
         			System.arraycopy(mostRecentDiff.array.get(i).hashBytes, 0, toSend, command.length() + 4 + i*16, 16);
         		}
         		
+        		//if (true)
+        		//	return new String(toSend);
+        		
         		out.write(toSend);
         		
         		//BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
@@ -469,12 +472,14 @@ public class MainActivity extends Activity {
                 //bb.order(ByteOrder.BIG_ENDIAN); default
                 int count = bb.getInt();
                 
+                //if (true)
+                //	return "File count " + count;
                 
                 for (int i=0; i < count; i++)
                 {
-                	byte[] metadataBytes = new byte[261];
-                	bytesRead = stream.read(metadataBytes, 0, 261);
-                	if (bytesRead < 261)
+                	byte[] filenameBytes = new byte[257];
+                	bytesRead = stream.read(filenameBytes, 0, 257);
+                	if (bytesRead < 257)
                 	{
                 		//s.close();
                 		return "Read unexpected number of metadata bytes";
@@ -483,7 +488,7 @@ public class MainActivity extends Activity {
                 	int nullTerm = -1;
                 	for (int k=0; k<257; k++)
                 	{
-                		if (metadataBytes[k] == 0)
+                		if (filenameBytes[k] == 0)
                 		{
                 			nullTerm = k;
                 			break;
@@ -495,26 +500,30 @@ public class MainActivity extends Activity {
                 		return "Error reading a filename";
                 	}
 
-                	byte[] filenameBytes = new byte[nullTerm];
-                	System.arraycopy(metadataBytes, 0, filenameBytes, 0, nullTerm);
-                	String filename = new String(filenameBytes);
+                	byte[] filenameBytesCutoff = new byte[nullTerm];
+                	System.arraycopy(filenameBytes, 0, filenameBytesCutoff, 0, nullTerm);
+                	String filename = new String(filenameBytesCutoff);
                 	
                 	byte[] filesizeBytes = new byte[4];
                 	bytesRead = stream.read(filesizeBytes, 0, 4);
                     if (bytesRead < 4)
                     {
                     	//s.close();
-                    	return "Error reading file count";
+                    	return "Error reading filesize";
                     }
                     
                     bb = ByteBuffer.wrap(filesizeBytes);
                     //bb.order(ByteOrder.BIG_ENDIAN); default
                     int filesize = bb.getInt();
                     
-                    //File file = new File(getFilesDir(), filename);
-                    try {
-                    	FileOutputStream outputStream = openFileOutput(filename, 0);
+                    //if (true)
+                    //	return "first filesize: " + filesize;
                     
+                    //File file = new File(getFilesDir(), filename);
+                    //file.createNewFile();
+                    try {
+                    	//FileOutputStream outputStream = openFileOutput(filename, 0);
+                    	FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
                     	byte[] buffer = new byte[8192];
                     	int f=0;
                     	while (f<filesize)
@@ -529,12 +538,11 @@ public class MainActivity extends Activity {
                     catch (Exception e)
                     {
                     	e.printStackTrace();
-                    	return "Error reading/writing file";
+                    	return "Error reading/writing file " + filename;
                     }
                 }
                 
-                //Close connection
-                //s.close();
+                
         	}
         	catch (UnknownHostException e) {
         		// TODO Auto-generated catch block

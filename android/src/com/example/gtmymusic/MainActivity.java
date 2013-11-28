@@ -3,6 +3,7 @@ package com.example.gtmymusic;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
@@ -10,7 +11,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 
 import android.os.AsyncTask;
@@ -18,12 +19,14 @@ import android.os.Bundle;
 import android.app.Activity;
 import android.view.Menu;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
 	
 	private ListItemArray mostRecentList = null;
 	private ListItemArray mostRecentDiff = null;
+	private Socket s = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +76,37 @@ public class MainActivity extends Activity {
 		}
 	}
 	
+	public void cap(View view)
+	{
+		EditText edit = (EditText)findViewById(R.id.edit_cap);
+		String capString = edit.getText().toString();
+		Integer cap = null;
+		try
+		{
+			cap = Integer.parseInt(capString);
+		}
+		catch (NumberFormatException e)
+		{
+			e.printStackTrace();
+			displayMessage("Improper format for cap");
+			return;
+		}
+		new CapTask().execute(cap);
+	}
+	
+	public void pull(View view)
+	{
+		if (mostRecentList == null)
+		{
+			displayMessage("Run DIFF first");
+		}
+		else
+		{
+		//displayMessage("Files on server:\n");
+			new PullTask().execute();
+		}
+	}
+	
 	public void displayMessage(String message)
     {
 		TextView text = (TextView)findViewById(R.id.message_text);
@@ -85,15 +119,23 @@ public class MainActivity extends Activity {
         text.setText(text.getText() + message);
     }
 	
+	public void displayCapValue(Integer value)
+	{
+		TextView text = (TextView)findViewById(R.id.current_cap_value);
+		text.setText(value.toString());
+	}
+	
 	private class ListItem
 	{
 		public String hash;
 		public String filename;
+		public byte[] hashBytes;
 		
-		public ListItem(String h, String f)
+		public ListItem(String h, String f, byte[] hb)
 		{
 			hash = h;
 			filename = f;
+			hashBytes = hb;
 		}
 	}
 	
@@ -113,7 +155,7 @@ public class MainActivity extends Activity {
 			}
 			if (found == false)
 			{
-				diff.addItem(new ListItem(authoritativeItem.hash, authoritativeItem.filename));
+				diff.addItem(new ListItem(authoritativeItem.hash, authoritativeItem.filename, authoritativeItem.hashBytes));
 			}
 		}
 		return diff;
@@ -138,7 +180,7 @@ public class MainActivity extends Activity {
 					}
 					digestIn.close();
 					byte[] hashBytes = digest.digest();
-					items.addItem(new ListItem(getHexString(hashBytes), filename));
+					items.addItem(new ListItem(getHexString(hashBytes), filename, hashBytes));
 				} catch (Exception e) {
 					e.printStackTrace();
 					return null;
@@ -201,7 +243,8 @@ public class MainActivity extends Activity {
 			ListItemArray items = new ListItemArray();
 			//NETWORKING GOES HERE
         	try {
-        		Socket s = new Socket("130.207.114.22", 6079);
+        		if (s==null)
+        			s = new Socket("130.207.114.22", 6079);
         		OutputStream out = s.getOutputStream();
         		
         		String command = "LIST";
@@ -222,7 +265,7 @@ public class MainActivity extends Activity {
                 int bytesRead = stream.read(countBytes, 0, 4);
                 if (bytesRead < 4)
                 {
-                	s.close();
+                	//s.close();
                 	return "Error reading item count";
                 }
                 
@@ -241,13 +284,15 @@ public class MainActivity extends Activity {
                 	bytesRead = stream.read(itemBytes, 0, 273);
                 	if (bytesRead < 273)
                 	{
-                		s.close();
+                		//s.close();
                 		return "Read unexpected number of item bytes";
                 	}
                 	
                 	
                 	//builder.append(", ");
-                	String hexString = getHexString(itemBytes);
+                	byte[] hashBytes = new byte[16];
+                	System.arraycopy(itemBytes, 0, hashBytes, 0, 16);
+                	String hexString = getHexString(hashBytes);
                 	
                 	int nullTerm = -1;
                 	
@@ -262,7 +307,7 @@ public class MainActivity extends Activity {
                 	
                 	if (nullTerm == -1)
                 	{
-                		s.close();
+                		//s.close();
                 		return "Error reading a filename";
                 	}
 
@@ -274,11 +319,11 @@ public class MainActivity extends Activity {
                 	
                 	//builder.append("\n");
                 	
-                	items.addItem(new ListItem(hexString, new String(filenameBytes)));
+                	items.addItem(new ListItem(hexString, new String(filenameBytes), hashBytes));
                 }
                 
                 //Close connection
-                s.close();
+                //s.close();
         	}
         	catch (UnknownHostException e) {
         		// TODO Auto-generated catch block
@@ -290,6 +335,215 @@ public class MainActivity extends Activity {
 			
         	mostRecentList = items;
 			return mostRecentList.toString();
+		}
+		
+		protected void onPostExecute(String result) {
+            appendMessage(result);
+        }
+	}
+	
+	private class CapTask extends AsyncTask<Integer, Void, SimpleEntry<String, Integer>>
+	{
+		protected SimpleEntry<String, Integer> doInBackground(Integer... params)
+		{
+			if (params.length != 1)
+				return new SimpleEntry<String, Integer>("Error with integer parameter", -1);
+			
+			Integer cap = params[0];
+			//StringBuilder builder = new StringBuilder();
+			//NETWORKING GOES HERE
+        	try {
+        		if (s==null)
+        			s = new Socket("130.207.114.22", 6079);
+        		OutputStream out = s.getOutputStream();
+        		
+        		String command = "CAP ";
+        		byte[] toSend = new byte[command.length() + 4];
+        		java.util.Arrays.fill(toSend, (byte)0);
+        		
+        		byte[] commandBytes = command.getBytes();
+        		System.arraycopy(commandBytes, 0, toSend, 0, commandBytes.length);
+        		//toSend[command.length()] = 0;	//last byte
+        		byte[] capBytes = ByteBuffer.allocate(4).putInt(cap).array();
+        		if (capBytes.length != 4)
+        		{
+        			//s.close();
+        			return new SimpleEntry<String, Integer>("Error converting cap to byte array", -1);
+        		}
+        		System.arraycopy(capBytes, 0, toSend, command.length(), capBytes.length);
+        		
+        		out.write(toSend);
+        		
+        		//BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
+                BufferedInputStream stream = new BufferedInputStream(s.getInputStream());	//size?
+        		//read
+                //byte[] bytes = new byte[32];
+                byte[] ackBytes = new byte[5];
+                int bytesRead = stream.read(ackBytes, 0, 5);
+                if (bytesRead < 5)
+                {
+                	//s.close();
+                	return new SimpleEntry<String, Integer>("Cap not accepted by server", -1);
+                }
+                
+                String ackString = new String(ackBytes);
+                if (ackString.equals("CAPOK"))
+                {
+                	return new SimpleEntry<String, Integer>("Cap accepted", cap);
+                }
+                else
+                {
+                	return new SimpleEntry<String, Integer>("Cap not accepted by server", -1);
+                }
+                
+                
+                //Close connection
+                //s.close();
+        	}
+        	catch (UnknownHostException e) {
+        		// TODO Auto-generated catch block
+        		e.printStackTrace();
+        	} catch (IOException e) {
+        		// TODO Auto-generated catch block
+        		e.printStackTrace();
+        	}
+        	
+        	return new SimpleEntry<String, Integer>("Cap not accepted by server", -1);
+		}
+		
+		protected void onPostExecute(SimpleEntry<String, Integer> result) {
+			displayCapValue(result.getValue());
+            displayMessage(result.getKey());
+        }
+	}
+	
+	private class PullTask extends AsyncTask<Void, Void, String>
+	{
+		protected String doInBackground(Void... params)
+		{
+			StringBuilder builder = new StringBuilder();
+			if (mostRecentDiff.array.size() == 0)
+				return "Client is up to date!";
+			
+			//NETWORKING GOES HERE
+        	try {
+        		if (s==null)
+        			s = new Socket("130.207.114.22", 6079);
+        		OutputStream out = s.getOutputStream();
+        		
+        		String command = "PULL";
+        		byte[] toSend = new byte[command.length() + 4 + mostRecentDiff.array.size()*16];
+        		java.util.Arrays.fill(toSend, (byte)0);
+        		
+        		byte[] commandBytes = command.getBytes();
+        		System.arraycopy(commandBytes, 0, toSend, 0, commandBytes.length);
+        		//toSend[command.length()] = 0;	//last byte
+        		
+        		byte[] countBytes = ByteBuffer.allocate(4).putInt(mostRecentDiff.array.size()).array();
+        		if (countBytes.length != 4)
+        		{
+        			return "Error converting count to byte array";
+        		}
+        		System.arraycopy(countBytes, 0, toSend, command.length(), countBytes.length);
+        		
+        		for(int i=0; i<mostRecentDiff.array.size(); i++)
+        		{
+        			System.arraycopy(mostRecentDiff.array.get(i).hashBytes, 0, toSend, command.length() + 4 + i*16, 16);
+        		}
+        		
+        		out.write(toSend);
+        		
+        		//BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
+                BufferedInputStream stream = new BufferedInputStream(s.getInputStream());
+        		//read
+                //byte[] bytes = new byte[32];
+                countBytes = new byte[4];
+                int bytesRead = stream.read(countBytes, 0, 4);
+                if (bytesRead < 4)
+                {
+                	//s.close();
+                	return "Error reading file count";
+                }
+                
+                ByteBuffer bb = ByteBuffer.wrap(countBytes);
+                //bb.order(ByteOrder.BIG_ENDIAN); default
+                int count = bb.getInt();
+                
+                
+                for (int i=0; i < count; i++)
+                {
+                	byte[] metadataBytes = new byte[261];
+                	bytesRead = stream.read(metadataBytes, 0, 261);
+                	if (bytesRead < 261)
+                	{
+                		//s.close();
+                		return "Read unexpected number of metadata bytes";
+                	}
+                	
+                	int nullTerm = -1;
+                	for (int k=0; k<257; k++)
+                	{
+                		if (metadataBytes[k] == 0)
+                		{
+                			nullTerm = k;
+                			break;
+                		}
+                	}                	
+                	if (nullTerm == -1)
+                	{
+                		//s.close();
+                		return "Error reading a filename";
+                	}
+
+                	byte[] filenameBytes = new byte[nullTerm];
+                	System.arraycopy(metadataBytes, 0, filenameBytes, 0, nullTerm);
+                	String filename = new String(filenameBytes);
+                	
+                	byte[] filesizeBytes = new byte[4];
+                	bytesRead = stream.read(filesizeBytes, 0, 4);
+                    if (bytesRead < 4)
+                    {
+                    	//s.close();
+                    	return "Error reading file count";
+                    }
+                    
+                    bb = ByteBuffer.wrap(filesizeBytes);
+                    //bb.order(ByteOrder.BIG_ENDIAN); default
+                    int filesize = bb.getInt();
+                    
+                    //File file = new File(getFilesDir(), filename);
+                    try {
+                    	FileOutputStream outputStream = openFileOutput(filename, 0);
+                    
+                    	byte[] buffer = new byte[8192];
+                    	int f=0;
+                    	while (f<filesize)
+                    	{
+                    		bytesRead = stream.read(buffer, 0, filesize-f > 8192 ? 8192 : filesize - f);
+                    		f += bytesRead;
+                    		outputStream.write(buffer, 0, bytesRead);
+                    	}
+                    	
+                    	builder.append(filename + "\n");
+                    }
+                    catch (Exception e)
+                    {
+                    	e.printStackTrace();
+                    	return "Error reading/writing file";
+                    }
+                }
+                
+                //Close connection
+                //s.close();
+        	}
+        	catch (UnknownHostException e) {
+        		// TODO Auto-generated catch block
+        		e.printStackTrace();
+        	} catch (IOException e) {
+        		// TODO Auto-generated catch block
+        		e.printStackTrace();
+        	}
+			return builder.toString();
 		}
 		
 		protected void onPostExecute(String result) {

@@ -8,6 +8,8 @@
     <string name="button_pull">PULL</string>
     <string name="button_leave">LEAVE</string>
     <string name="button_cap">SET CAP</string>
-    <string name="cap_hint">Set cap in MB</string>
-
+    <string name="cap_hint">Cap in MB</string>
+    <string name="current_cap">Current: </string>
+	<string name="current_cap_value">N/A</string>
+    
 </resources>

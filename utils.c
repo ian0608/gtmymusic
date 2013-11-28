@@ -121,7 +121,7 @@ list_item_array *get_list_items_current_dir()
 			
 			//hash & filename
 			unsigned char hash[MD5_DIGEST_LENGTH];
-			int64_t filesize;
+			int32_t filesize;
 			FILE *file = fopen(entry->d_name, "rb");
 			if (file == NULL)
 			{

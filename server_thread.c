@@ -227,7 +227,7 @@ while(1) {
 }
 
 void cap_resp(int clientSock, int32_t clientCap){ 
-	cap = clientCap;
+	cap = 1049000*clientCap;
 	char ackBuffer[CAP_ACK_SIZE] = "CAPOK";
 	ssize_t numBytesSent = 0;
  	   
@@ -274,14 +274,38 @@ void pull_resp(int clientSock, int bufferCount, unsigned char *buffer) {
 		}
 	}
 
-	// Sort the array in descending order
-	sort_descending_playcount(&myList);
+
 	/*	
 	for(i = 0; i < myList->count; i++) {
 		printf("%i Filename: %s Playcount:%i\n", i, myList->items[i]->filename, myList->items[i]->playcount);
 	}*/
 
 	// Check for a cap
+	if (cap > 0) {	
+		
+		// If cap exists sort the array in descending popularity
+		sort_descending_playcount(&myList);
+
+		// Get the cap and decrement for CAP_ACK and # files
+		int tempCap = cap - CAP_ACK_SIZE - sizeof(int32_t);
+
+		// Iterate through list and check each filesize
+		for (i = 0; i < myList->count; i++) {
+			// Calculate bytes required to send file 
+			int32_t bytesRequiredToSend = (myList->items[i]->filesize + sizeof(int32_t));
+			
+			// If small enough, do not delete file from list
+			if (bytesRequiredToSend < tempCap) {
+				tempCap -= bytesRequiredToSend;			
+			}
+			
+			// If too large, delete file from list
+			else {
+				delete_index_from_array(&myList, i);
+				i--;
+			}
+		}
+	}
 	
 	// Create variable listCount and its network counterpart
 	int listCount = myList->count;

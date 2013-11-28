@@ -4,6 +4,16 @@
 #include "gtmymusic.h"
 
 
+
+void DieWithErr(char *errorMessage){
+    printf("%s\n", errorMessage);
+    exit(EXIT_FAILURE);
+}
+
+void Err(char *errorMessage) {
+    printf("%s\n", errorMessage);
+}
+
 /*
 Requires linking with -lcrypto
 */
@@ -43,6 +53,21 @@ int incr_size_list_item_array(list_item_array **toIncr)
 	return 0;
 }
 
+int delete_index_from_array(list_item_array **toDeleteFrom, int index) {
+	if (index < 0 || index >= (*toDeleteFrom)->count) 
+		return -1;
+	if (index != (*toDeleteFrom)->count-1) {
+		memcpy((*toDeleteFrom)->items[index], (*toDeleteFrom)->items[(*toDeleteFrom)->count-1], sizeof(list_item));
+	}
+	free((*toDeleteFrom)->items[(*toDeleteFrom)->count-1]);
+	(*toDeleteFrom)->count --;
+	(*toDeleteFrom)->items = realloc((*toDeleteFrom)->items,(*toDeleteFrom)->count*sizeof(list_item));
+	if((*toDeleteFrom)->items == NULL)
+		return -1;
+	return 0;
+
+}
+
 /*
 This function returns a pointer to a list_item_array representing the mp3 files in the current directory. Each individual list_item contains the filename and MD5 hash of the file contents. See main for an example.
 */
@@ -75,11 +100,26 @@ list_item_array *get_list_items_current_dir()
 			
 			//hash & filename
 			unsigned char hash[MD5_DIGEST_LENGTH];
+			int64_t filesize;
 			FILE *file = fopen(entry->d_name, "rb");
 			if (file == NULL)
 			{
 				return NULL;
 			}
+
+			/* COMPUTE FILE SIZE */
+		    	if (fseek(file, 0, SEEK_END) == 0) {
+				filesize = ftell(file);
+		       		if (filesize == -1) 
+			    		Err("ftell() failed to SEEK_END");
+		    	}
+			else {
+				Err("fseek() failed failed to SEEK_END");
+			}
+		    	if (fseek(file, 0, SEEK_SET) != 0) {
+				Err("fseek() failed to SEEK_SET");
+		    	}
+
 			MD5_CTX context;
 			int read;
 			unsigned char buffer[1000];
@@ -89,8 +129,9 @@ list_item_array *get_list_items_current_dir()
 				MD5_Update(&context, buffer, read);
 			}
 			fclose(file);
-			MD5_Final(hash, &context);			
-			
+			MD5_Final(hash, &context);	
+
+			item_array->items[item_array->count-1]->filesize = filesize;
 			memcpy(item_array->items[item_array->count-1]->hash, hash, MD5_DIGEST_LENGTH);
 			memcpy(item_array->items[item_array->count-1]->filename, entry->d_name, strlen(entry->d_name)+1);
 

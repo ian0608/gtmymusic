@@ -24,34 +24,28 @@
 //#include <libxml/parser.h>
 #include "gtmymusic.h"
 
-		
+#define _MULTI_THREADED		
 #define ARG1_SIZE 4
-#define ARG2_SIZE MD5_DIGEST_LENGTH
-#define CLNT_REQ_BUFSIZE ARG1_SIZE + 1 + ARG2_SIZE /* The client request should be 21 bytes long*/
+#define CLNT_REQ_CAP_BUFSIZE ARG1_SIZE + 4 /* Client CAP request is 8 bytes: "CAP "+ int32_t */
+#define CLNT_REQ_PULL_BUFSIZE ARG1_SIZE + 4
+#define CAP_ACK_SIZE 5
 #define FILENAME_LENGTH 257
 #define MAXPENDING 5
 
 pthread_mutex_t logLock = PTHREAD_MUTEX_INITIALIZER;
+__thread int32_t cap = -1;
 
-
-
-void DieWithErr(char *errorMessage){
-    printf("%s\n", errorMessage);
-    exit(EXIT_FAILURE);
-}
-
-void Err(char *errorMessage) {
-    printf("%s\n", errorMessage);
-}
 
 struct ThreadArgs {
     int clntSock;
 };
 
 void *ThreadMain(void *args);
+void cap_resp(int clientSock, int32_t clientCap);
 void send_list(int clientSock);
 void send_list2(int clientSock);
-void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]);
+void pull_resp(int clientSock, int bufferCount, unsigned char *buffer);
+void send_file_from_hash(int clientSock, unsigned char hash[MD5_DIGEST_LENGTH]);
 void logger(int socket, char *string);
 
 /* The main function */
@@ -125,12 +119,11 @@ int main(int argc, char *argv[])
 
 void *ThreadMain(void *threadArgs) {
     
-    int clientSock;				/* Client Socket */
-    int i;
-    char clientRequest[CLNT_REQ_BUFSIZE];/* Buff to store name from client */
-    char *clientReqp = clientRequest;
+    int clientSock;		
     char clientArg1[ARG1_SIZE];
-    unsigned char clientArg2[ARG2_SIZE];
+    int32_t clientCapArg2 = 0;
+    int32_t clientPullArg2 = 0;
+    unsigned char *clientPullArg3;
     
     // Setup Pthread & get the args
     pthread_detach(pthread_self());
@@ -141,59 +134,80 @@ void *ThreadMain(void *threadArgs) {
 while(1) {
 
     // Clear the buffers
-    memset(clientRequest, 0, CLNT_REQ_BUFSIZE);
     memset(clientArg1, 0, ARG1_SIZE);
-    memset(clientArg2, 0, ARG2_SIZE);
     
     unsigned int numBytesRecvd = 0;
-    /* Extract CLIENT REQUEST ARG 1 from the packet, store in clientRequest, arg1*/ 
+    /* Extract CLIENT REQUEST ARG 1 from the packet, store in clientArg1, arg1*/ 
     while (numBytesRecvd < ARG1_SIZE) {
-    	numBytesRecvd += recv(clientSock, clientRequest + numBytesRecvd, CLNT_REQ_BUFSIZE, 0);
+    	numBytesRecvd += recv(clientSock, clientArg1 + numBytesRecvd, ARG1_SIZE, 0);
    	if (numBytesRecvd < 0) {
         	Err("recv() failed");
 		return(NULL);
 	}
     	else if (numBytesRecvd == 0){
-		Err("recv() closed prematurely");
+		Err("recv() closed prematurely 1");
 		return(NULL);
 	}
     }
 //
-    printf("\n\nClient Request: %.04s\n\n", clientRequest);
+    printf("\n\nClient Request: %.04s\n\n", clientArg1);
     
-    memcpy(clientArg1, clientReqp, (size_t) ARG1_SIZE);
-    
+    numBytesRecvd = 0;
     /* DETERMINE NEXT FUNCTION CALL */
     if ((memcmp(clientArg1, "PULL", ARG1_SIZE)) == 0) {
-	    	printf("PULL\n");
-	    	/* Extract CLIENT REQUEST from the packet, store in clientRequest, arg1 and arg2 */ 
-	    	while (numBytesRecvd < CLNT_REQ_BUFSIZE) {
-	    		numBytesRecvd += recv(clientSock, clientRequest + numBytesRecvd, CLNT_REQ_BUFSIZE, 0);
-   			if (numBytesRecvd < 0) {
-				Err("recv() failed");
-				return(NULL);
-			}
-	    		else if (numBytesRecvd == 0) {
-				Err("recv() closed prematurely");
-				return(NULL);
-			}
-	    	}
-	    	clientReqp = clientRequest;
-    		memcpy(clientArg2, clientReqp + ARG1_SIZE + 1, (size_t) ARG2_SIZE);
-
-    		//printf("Client Arg 2: ");
-    
-    		for (i = 0; i < ARG2_SIZE; i++) { 
-    			printf("%02x", clientArg2[i]);
-   		}
-    		printf("\n");
-	    	pull_resp(clientSock, clientArg2);
+	printf("PULL\n");
+    	while (numBytesRecvd < sizeof(int32_t)) {
+    		numBytesRecvd += recv(clientSock, &clientPullArg2 + numBytesRecvd, sizeof(int32_t), 0);
+		if (numBytesRecvd < 0) {
+			Err("recv() failed");
+			return(NULL);
+		}
+    		else if (numBytesRecvd == 0) {
+			Err("recv() closed prematurely");
+			return(NULL);
+		}
+    	}
+	clientPullArg2 = ntohl(clientPullArg2);
+	printf("%i\n", clientPullArg2);
+	clientPullArg3 = malloc(MD5_DIGEST_LENGTH*clientPullArg2);
+	if (clientPullArg3 == NULL)
+		DieWithErr("malloc() Pull Arg 3 failed");
+	numBytesRecvd = 0;
+	while (numBytesRecvd < MD5_DIGEST_LENGTH*clientPullArg2) {
+		printf("RECV\n");
+    		numBytesRecvd += recv(clientSock, clientPullArg3 + numBytesRecvd, MD5_DIGEST_LENGTH*clientPullArg2, 0);
+		if (numBytesRecvd < 0) {
+			Err("recv() failed");
+			return(NULL);
+		}
+    		else if (numBytesRecvd == 0) {
+			Err("recv() closed prematurely");
+			return(NULL);
+		}
+    	}
+	pull_resp(clientSock, clientPullArg2, clientPullArg3);
+	free(clientPullArg3);
     }
     else if((memcmp(clientArg1, "LIST", ARG1_SIZE)) == 0) {
-	//printf("LIST\n");
+	printf("LIST\n");
         send_list2(clientSock);
     }
     else if ((memcmp(clientArg1, "CAP ", ARG1_SIZE)) == 0) {
+	printf("CAP\n");
+    	while (numBytesRecvd < CLNT_REQ_CAP_BUFSIZE) {
+    		numBytesRecvd += recv(clientSock, &clientCapArg2 + numBytesRecvd, sizeof(int32_t), 0);
+		if (numBytesRecvd < 0) {
+			Err("recv() failed");
+			return(NULL);
+		}
+    		else if (numBytesRecvd == 0) {
+			Err("recv() closed prematurely");
+			return(NULL);
+		}
+    	}
+	clientCapArg2 = ntohl(clientCapArg2);
+	printf("%i\n", clientCapArg2);
+    	cap_resp(clientSock, clientCapArg2);
 
     }
     else if((memcmp(clientArg1, "QUIT", ARG1_SIZE)) == 0) {
@@ -208,98 +222,150 @@ while(1) {
 	
 }
 
-void pull_resp(int clientSock, unsigned char hash[ARG2_SIZE]) {
-	unsigned char *sendBuff;
+void cap_resp(int clientSock, int32_t clientCap){ 
+	cap = clientCap;
+	char ackBuffer[CAP_ACK_SIZE] = "CAPOK";
+	ssize_t numBytesSent = 0;
+ 	   
+ 	while (numBytesSent < CAP_ACK_SIZE) {
+     		numBytesSent += send(clientSock, ackBuffer + numBytesSent, CAP_ACK_SIZE, 0);
+    	    	printf("Number of bytes sent %zu\n", numBytesSent);
+    	}
+}
+
+void pull_resp(int clientSock, int bufferCount, unsigned char *buffer) {
+	unsigned char *sendBuff = NULL;
     	FILE *file1;
-	char *filename = NULL;
+	int i;
+	int j;
+	int match;
 	//char *test = "04 Son's Gonna Rise.mp3";
 	
+
+	// Get list of mp3s in directory
 	list_item_array *myList = get_list_items_current_dir();
 	if (myList == NULL) {
 		Err("get_list_items_current_dir() failed");
 	}
-    
+
+	// Prints hash buffer containing client requested hashes
+	for (j=0; j < MD5_DIGEST_LENGTH*bufferCount; j++)				
+		printf("%02x", buffer[j]);
+	printf("\n");
+
+	// Iterates through list and removes mp3s with unrequested hashes
+	for(i = 0; i < myList->count; i++) {
+		match = 0;
+		for(j = 0; j < bufferCount; j++){
+			printf("Check %i %i\n", i, j);
+			if(memcmp(myList->items[i]->hash, buffer + MD5_DIGEST_LENGTH*j, MD5_DIGEST_LENGTH) == 0) {
+				match++;
+				printf("MATCH\n");
+			}
+		}
+		if (match <= 0) {
+			printf("DELETE\n");
+			delete_index_from_array(&myList, i);
+			i--;
+		}
+	}
+
+	printf("Match Count: %i\n", myList->count);
+	
+	// Create variable listCount and its network counterpart
 	int listCount = myList->count;
-	int i;
-	for (i = 0; i < listCount; i ++)		{
-		int j;
-		for (j=0; j < MD5_DIGEST_LENGTH; j++) {		
-		        if (memcmp(myList->items[i]->hash, hash, ARG2_SIZE) == 0) {
-			      //printf("%s\n", myList->items[i]->filename);
-			      filename = myList->items[i]->filename;
-			}
-			//printf("%02x", myList->items[i]->hash[j]);
-		}
-		//printf("\n");
-	}
-	printf("File: %s\n", filename);
-	logger(clientSock, filename);
-
-
-	int64_t sendBuffSize;
-	int64_t fileSize;
-
-	if (filename != NULL) {
-		    /* OPEN FILE */
-	   	if ((file1 = fopen(filename, "r")) == NULL){
-	      		Err("File I/O err: fopen() failed");
-	    	}
-	    
-	    	/* COMPUTE FILE SIZE */
-	    	if (fseek(file1, 0, SEEK_END) == 0) {
-			fileSize = ftell(file1);
-			sendBuffSize = fileSize + sizeof(int64_t);
-	       		if (sendBuffSize == -1) {
-		    		Err("ftell() failed to SEEK_END");
-			}
-			printf("sendBuffSize: %" PRId64 " bytes \n", sendBuffSize);
-	    	}
-		else {
-			Err("fseek() failed failed to SEEK_END");
-		}
-	    
-	    	sendBuff = malloc(sendBuffSize);
-	    	if (sendBuff == NULL) {
-			Err("malloc() failed");
-	    	}
-	    	if (fseek(file1, 0, SEEK_SET) != 0) {
-			Err("fseek() failed to SEEK_SET");
-	    	}
-	    
-	  
-		memcpy(sendBuff, &fileSize, sizeof(int64_t));
-	    
-	    
-	    	/* READ FILE TO BUFFER*/
-	    	size_t newLen = fread(sendBuff + sizeof(int64_t), sizeof(char), fileSize, file1);
-	    	if (newLen == 0) {
-			Err("File I/O err: fread() failed");
-	    	} else {
-	    	    	//sendBuff[++newLen] = '\0'; // Just to be safe add null terminator
-	    	}
-	}
-	else{
-		fileSize = -1;
-		sendBuffSize = sizeof(int64_t);
-		sendBuff = malloc(sendBuffSize);
-		if (sendBuff == NULL) {
-			Err("malloc() failed");		
-		}
-		memcpy(sendBuff, &fileSize, sizeof(int64_t));
-	}
-
-  	/* Send file to client */
-	/*	FILL IN	  */
- 	ssize_t numBytesSent = 0;
- 	   
- 	while (numBytesSent < sendBuffSize) {
-     		numBytesSent += send(clientSock, sendBuff + numBytesSent, sendBuffSize, 0);
+	int networkListCount = htonl(listCount);
+	
+	// Send # of outgoing files to client
+	int numBytesSent = 0;   
+ 	while (numBytesSent < sizeof(int32_t)) {
+     		numBytesSent += send(clientSock, &networkListCount + numBytesSent, sizeof(int32_t), 0);
     	    	printf("Number of bytes sent %zu\n", numBytesSent);
     	}
-    
-    	free(sendBuff);
+	
+	int64_t networkFileSize;
+	int64_t fileSize;
+	unsigned char nameBuffer[FILENAME_LENGTH];
+
+	// Iterate through each item in the list and send to client
+	for (i = 0; i < listCount; i ++)		{
+		if (myList->items[i]->filename != NULL) {
+		    
+			// Get the filename into nameBuffer
+			memset(nameBuffer,0, FILENAME_LENGTH);
+			memcpy(nameBuffer, myList->items[i]->filename, FILENAME_LENGTH);
+			printf("FNAME: %s\n", nameBuffer);
+
+			// Send namebuffer to client
+			numBytesSent = 0;
+		 	while (numBytesSent < FILENAME_LENGTH) {
+		     		numBytesSent += send(clientSock, nameBuffer + numBytesSent, FILENAME_LENGTH, 0);
+		    	    	printf("Number of bytes sent %zu\n", numBytesSent);
+		    	}
+			
+
+			// Get the filesize and its network counterpart
+			fileSize = myList->items[i]->filesize;
+			printf("sendBuffSize: %" PRId64 " bytes \n", fileSize);						
+			networkFileSize = htonl(fileSize);			
+	
+			// Send filesize to client
+			numBytesSent = 0;
+		 	while (numBytesSent < sizeof(int64_t)) {
+		     		numBytesSent += send(clientSock, &networkFileSize + numBytesSent, sizeof(int64_t), 0);
+		    	    	printf("Number of bytes sent %zu\n", numBytesSent);
+		    	}
+
+			// Allocate memory for filebuffer
+		    	sendBuff = realloc(sendBuff, fileSize);
+		    	if (sendBuff == NULL) {
+				Err("malloc() failed");
+		    	}
+
+			// OPEN FILE 
+		   	if ((file1 = fopen(myList->items[i]->filename, "r")) == NULL){
+		      		Err("File I/O err: fopen() failed");
+		    	}
+
+		    	// READ FILE TO BUFFER
+		    	size_t newLen = fread(sendBuff, fileSize, 1, file1);
+		    	if (newLen == 0) {
+				Err("File I/O err: fread() failed");
+		    	} 
+
+			// Close the file
+			fclose(file1);
+
+			// Send filebuffer to client
+			numBytesSent = 0;
+			while (numBytesSent < fileSize) {
+		     		numBytesSent += send(clientSock, sendBuff + numBytesSent, fileSize, 0);
+		    	    	printf("Number of bytes sent %zu\n", numBytesSent);
+		    	}
+
+			// Log the transaction
+			printf("File: %s\n", myList->items[i]->filename);
+			logger(clientSock, myList->items[i]->filename);
+
+		}
+		else{
+			fileSize = -1;
+			networkFileSize = htonl(fileSize);
+			numBytesSent = 0;
+		 	while (numBytesSent < sizeof(int64_t)) {
+		     		numBytesSent += send(clientSock, &networkFileSize + numBytesSent, sizeof(int64_t), 0);
+		    	    	printf("Number of bytes sent %zu\n", numBytesSent);
+		    	}
+		}  
+	}
+	if(sendBuff != NULL){
+		free(sendBuff);	
+	}
+    	
+	teardown_list_item_array(myList);
 
 }
+
 
 void send_list(int clientSock) {
 	logger(clientSock, "list");

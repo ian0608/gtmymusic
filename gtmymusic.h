@@ -4,7 +4,7 @@
 typedef struct {
 	unsigned char hash[MD5_DIGEST_LENGTH];
 	char filename[NAME_MAX + 1];
-	int64_t filesize;
+	int32_t filesize;
 	int playcount;
 } list_item;
 

@@ -294,8 +294,8 @@ void pull_resp(int clientSock, int bufferCount, unsigned char *buffer) {
     	    	printf("Number of bytes sent %zu ", numBytesSent);
     	}
 	
-	int64_t networkFileSize;
-	int64_t fileSize;
+	int32_t networkFileSize;
+	int32_t fileSize;
 	unsigned char nameBuffer[FILENAME_LENGTH];
 
 	// Iterate through each item in the list and send to client
@@ -316,13 +316,13 @@ void pull_resp(int clientSock, int bufferCount, unsigned char *buffer) {
 
 			// Get the filesize and its network counterpart
 			fileSize = myList->items[i]->filesize;
-			printf("sendBuffSize: %" PRId64 " bytes \n", fileSize);						
+			printf("sendBuffSize: %i bytes \n", fileSize);						
 			networkFileSize = htonl(fileSize);			
 	
 			// Send filesize to client
 			numBytesSent = 0;
-		 	while (numBytesSent < sizeof(int64_t)) {
-		     		numBytesSent += send(clientSock, &networkFileSize + numBytesSent, sizeof(int64_t), 0);
+		 	while (numBytesSent < sizeof(int32_t)) {
+		     		numBytesSent += send(clientSock, &networkFileSize + numBytesSent, sizeof(int32_t), 0);
 		    	    	printf("Number of bytes sent %zu ", numBytesSent);
 		    	}
 
@@ -362,8 +362,8 @@ void pull_resp(int clientSock, int bufferCount, unsigned char *buffer) {
 			fileSize = -1;
 			networkFileSize = htonl(fileSize);
 			numBytesSent = 0;
-		 	while (numBytesSent < sizeof(int64_t)) {
-		     		numBytesSent += send(clientSock, &networkFileSize + numBytesSent, sizeof(int64_t), 0);
+		 	while (numBytesSent < sizeof(int32_t)) {
+		     		numBytesSent += send(clientSock, &networkFileSize + numBytesSent, sizeof(int32_t), 0);
 		    	    	printf("Number of bytes sent %zu\n", numBytesSent);
 		    	}
 		}  

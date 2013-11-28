@@ -18,6 +18,9 @@ void Err(char *errorMessage);
 int init_list_item_array(list_item_array **toInit);
 int incr_size_list_item_array(list_item_array **toIncr);
 int delete_index_from_array(list_item_array **toDeleteFrom, int index);
+int sort_descending_playcount(list_item_array **toSort);
 list_item_array *get_list_items_current_dir();
 void teardown_list_item_array(list_item_array *item_array);
 list_item_array *diff_lists(list_item_array *authoritative, list_item_array *other);
+
+int get_playcount(char input[]);

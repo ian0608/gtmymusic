@@ -68,6 +68,27 @@ int delete_index_from_array(list_item_array **toDeleteFrom, int index) {
 
 }
 
+int sort_descending_playcount(list_item_array **toSort) {
+	list_item *temp = malloc(sizeof(list_item));
+	int count = (*toSort)->count;
+	int i;
+	int j;
+	
+	// BUBBLESORT
+	for (i = 0 ; i < (count - 1); i++) {
+		for (j = 0 ; j < (count - i - 1); j++) {
+			if ((*toSort)->items[j]->playcount < (*toSort)->items[j+1]->playcount) 
+			{
+				memcpy(temp, (*toSort)->items[j], sizeof(list_item)); 
+				memcpy((*toSort)->items[j], (*toSort)->items[j+1], sizeof(list_item)); 
+				memcpy((*toSort)->items[j+1], temp, sizeof(list_item)); 
+		        }
+		}
+	}
+	free(temp);
+	return 0;
+}
+
 /*
 This function returns a pointer to a list_item_array representing the mp3 files in the current directory. Each individual list_item contains the filename and MD5 hash of the file contents. See main for an example.
 */
@@ -131,9 +152,11 @@ list_item_array *get_list_items_current_dir()
 			fclose(file);
 			MD5_Final(hash, &context);	
 
+			item_array->items[item_array->count-1]->playcount = get_playcount(entry->d_name);
 			item_array->items[item_array->count-1]->filesize = filesize;
 			memcpy(item_array->items[item_array->count-1]->hash, hash, MD5_DIGEST_LENGTH);
 			memcpy(item_array->items[item_array->count-1]->filename, entry->d_name, strlen(entry->d_name)+1);
+			//printf("Filename: %s PlayCount: %i\n", entry->d_name, item_array->items[item_array->count-1]->playcount);
 
 			
 		}

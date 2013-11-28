@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.AbstractMap.SimpleEntry;
@@ -364,7 +365,7 @@ public class MainActivity extends Activity {
         		byte[] commandBytes = command.getBytes();
         		System.arraycopy(commandBytes, 0, toSend, 0, commandBytes.length);
         		//toSend[command.length()] = 0;	//last byte
-        		byte[] capBytes = ByteBuffer.allocate(4).putInt(cap).array();
+        		byte[] capBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(cap).array();
         		if (capBytes.length != 4)
         		{
         			//s.close();
@@ -372,6 +373,9 @@ public class MainActivity extends Activity {
         		}
         		System.arraycopy(capBytes, 0, toSend, command.length(), capBytes.length);
         		
+        		//if (true)
+        		//	return new SimpleEntry<String, Integer> (new String(toSend), (int)toSend[7]);
+        					
         		out.write(toSend);
         		
         		//BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));

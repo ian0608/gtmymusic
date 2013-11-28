@@ -48,13 +48,13 @@
         android:layout_weight="1"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:hint="@string/cap_hint" 
-        android:onClick="cap" />
+        android:hint="@string/cap_hint" />
         
         <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/button_cap" />
+        android:text="@string/button_cap"
+        android:onClick="cap" />
         
         <TextView
         android:layout_width="wrap_content"

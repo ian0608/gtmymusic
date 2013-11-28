@@ -196,7 +196,8 @@ while(1) {
     }
     else if ((memcmp(clientArg1, "CAP ", ARG1_SIZE)) == 0) {
 	printf("CAP\n");
-    	while (numBytesRecvd < CLNT_REQ_CAP_BUFSIZE) {
+	numBytesRecvd = 0;
+    	while (numBytesRecvd < sizeof(int32_t)) {
     		numBytesRecvd += recv(clientSock, &clientCapArg2 + numBytesRecvd, sizeof(int32_t), MSG_WAITALL);
 		if (numBytesRecvd < 0) {
 			Err("recv() failed");
@@ -228,9 +229,9 @@ while(1) {
 
 void cap_resp(int clientSock, int32_t clientCap){ 
 	cap = 1049000*clientCap;
-	char ackBuffer[CAP_ACK_SIZE] = "CAPOK";
+	char ackBuffer[CAP_ACK_SIZE + 1] = "CAPOK";
 	ssize_t numBytesSent = 0;
- 	   
+
  	while (numBytesSent < CAP_ACK_SIZE) {
      		numBytesSent += send(clientSock, ackBuffer + numBytesSent, CAP_ACK_SIZE, 0);
     	    	printf("Number of bytes sent %zu\n", numBytesSent);

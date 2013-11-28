@@ -194,7 +194,7 @@ while(1) {
 	printf("LIST\n");
         send_list2(clientSock);
     }
-    else if ((memcmp(clientArg1, "CAP_", ARG1_SIZE)) == 0) {
+    else if ((memcmp(clientArg1, "CAP ", ARG1_SIZE)) == 0) {
 	printf("CAP\n");
     	while (numBytesRecvd < CLNT_REQ_CAP_BUFSIZE) {
     		numBytesRecvd += recv(clientSock, &clientCapArg2 + numBytesRecvd, sizeof(int32_t), MSG_WAITALL);
